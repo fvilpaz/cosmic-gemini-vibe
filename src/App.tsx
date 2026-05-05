@@ -43,6 +43,8 @@ export default function App() {
 
   useEffect(() => {
     const handleResize = () => {
+      winWRef.current = window.innerWidth;
+      winHRef.current = window.innerHeight;
       setIsLandscape(window.innerWidth > window.innerHeight);
     };
     handleResize();
@@ -107,9 +109,11 @@ export default function App() {
   const [dollars, setDollars] = useState<
     { id: string; x: number; isCollected: boolean }[]
   >([]);
+  const dollarsRef = useRef<{ id: string; x: number; isCollected: boolean }[]>([]);
   const [flyers, setFlyers] = useState<
     { id: string; x: number; isCollected: boolean }[]
   >([]);
+  const flyersRef = useRef<{ id: string; x: number; isCollected: boolean }[]>([]);
   const [projectiles, setProjectiles] = useState<
     { id: string; x: number; y: number; tier: number }[]
   >([]);
@@ -177,22 +181,21 @@ export default function App() {
     enemiesRef.current = freshEnemies;
     setEnemies(freshEnemies);
 
-    setDollars(
-      level.dollarSpawns.map((x, i) => ({
-        id: `${idx}-coin-${i}`,
-        x: x,
-        isCollected: false,
-      })),
-    );
+    const newDollars = level.dollarSpawns.map((x, i) => ({
+      id: `${idx}-coin-${i}`,
+      x: x,
+      isCollected: false,
+    }));
+    dollarsRef.current = newDollars;
+    setDollars(newDollars);
 
-    setFlyers(
-      (level.flyerSpawns || []).map((x, i) => ({
-        id: `${idx}-flyer-${i}`,
-        x: x,
-        y: 0, // Ground level fix
-        isCollected: false,
-      })),
-    );
+    const newFlyers = (level.flyerSpawns || []).map((x, i) => ({
+      id: `${idx}-flyer-${i}`,
+      x: x,
+      isCollected: false,
+    }));
+    flyersRef.current = newFlyers;
+    setFlyers(newFlyers);
 
     setProjectiles([]);
     setPowerLevel(0);
@@ -221,8 +224,6 @@ export default function App() {
     setIsMeteorCrash(false);
     isMeteorCrashRef.current = false;
     setGameState("interlevel");
-
-    // Show interlevel for 2 seconds
     setTimeout(() => {
       setGameState("playing");
     }, 2000);
@@ -249,6 +250,8 @@ export default function App() {
   }, [nextLevel]);
 
   const lastTimeRef = useRef<number>(0);
+  const winWRef = useRef(window.innerWidth);
+  const winHRef = useRef(window.innerHeight);
 
   const gameLoop = useCallback((time: number) => {
     if (!lastTimeRef.current) lastTimeRef.current = time;
@@ -277,9 +280,9 @@ export default function App() {
       setUfoHoverY(Math.sin(ufoPhaseRef.current) * 15);
     }
 
-    const isL = window.innerWidth > window.innerHeight;
-    const gScale = isL ? Math.max(1, window.innerWidth / 1200) : 1;
-    const internalH = isL ? window.innerHeight / gScale : window.innerHeight;
+    const isL = winWRef.current > winHRef.current;
+    const gScale = isL ? Math.max(1, winWRef.current / 1200) : 1;
+    const internalH = isL ? winHRef.current / gScale : winHRef.current;
     const baseSpeed = (isL ? 3.2 : 1.7) / gScale;
     let nX = playerXRef.current + baseSpeed * timeScale;
     let nY = playerYRef.current;
@@ -479,10 +482,8 @@ export default function App() {
         }
       }
 
-      const lscale = window.innerWidth > window.innerHeight ? 1.05 : 1;
-      const isL = window.innerWidth > window.innerHeight;
-      const isW2 = currentLevelRef.current?.number === 7;
-      const eScaleMultiplier = isL ? (isW2 ? 1.2 : 0.85) : 0.95;
+      const lscale = isL ? 1.05 : 1;
+      const eScaleMultiplier = isL ? 0.85 : 0.95;
       const pScale =
         (isFlyingRef.current
           ? 0.9
@@ -644,9 +645,9 @@ export default function App() {
           // Spawn from tractor position — bottom-right, low arc
           const throwCamX = Math.max(
             0,
-            nX - (isL ? 1200 : window.innerWidth) / 3,
+            nX - (isL ? 1200 : winWRef.current) / 3,
           );
-          const baseX = throwCamX + window.innerWidth - 100;
+          const baseX = throwCamX + winWRef.current - 100;
           const baseY = -160;
 
           enemiesRef.current.push({
@@ -690,9 +691,9 @@ export default function App() {
           const variants = ["flask", "wrench", "gadget"];
           const throwCamX = Math.max(
             0,
-            nX - (isL ? 1200 : window.innerWidth) / 3,
+            nX - (isL ? 1200 : winWRef.current) / 3,
           );
-          const baseX = throwCamX + window.innerWidth - 100;
+          const baseX = throwCamX + winWRef.current - 100;
           const baseY = -160;
 
           enemiesRef.current.push({
@@ -722,13 +723,10 @@ export default function App() {
       setProfPhase(profPhaseRef.current);
 
     // Direct DOM update for enemies
-    enemiesRef.current.forEach((e) => {
-      const groundY = window.innerWidth > window.innerHeight ? 70 : 120;
-
-      const isL = window.innerWidth > window.innerHeight;
-      const isW2 = currentLevelRef.current?.number === 7;
-      const eScaleMultiplier = isL ? (isW2 ? 1.2 : 0.85) : 0.95;
-
+    const groundY = isL ? 70 : 120;
+    const isW2 = currentLevelRef.current?.number === 7;
+    const eScaleMultiplier = isL ? 0.85 : 0.95;
+    enemiesRef.current.forEach((e: any) => {
       const el = document.getElementById("enemy-" + e.id);
       if (el) {
         el.style.left = `${e.x}px`;
@@ -780,9 +778,9 @@ export default function App() {
 
     // Collectibles
     let dollarCollectedCount = 0;
-    setDollars((prev) => {
+    {
       let changed = false;
-      const next = prev.map((d) => {
+      const next = dollarsRef.current.map((d: { id: string; x: number; isCollected: boolean }) => {
         if (!d.isCollected && Math.abs(nX - d.x) < 70 && Math.abs(nY) < 70) {
           changed = true;
           dollarCollectedCount += 1;
@@ -791,8 +789,11 @@ export default function App() {
         }
         return d;
       });
-      return changed ? next : prev;
-    });
+      if (changed) {
+        dollarsRef.current = next;
+        setDollars(next);
+      }
+    }
 
     if (dollarCollectedCount > 0) {
       setDollarsCollected((curr) => curr + dollarCollectedCount);
@@ -806,9 +807,9 @@ export default function App() {
       }
     }
 
-    setFlyers((prev) => {
+    {
       let changed = false;
-      const next = prev.map((f) => {
+      const next = flyersRef.current.map((f: { id: string; x: number; isCollected: boolean }) => {
         // Must jump to collect (nY must be sufficiently high)
         if (!f.isCollected && Math.abs(nX - f.x) < 80 && nY < -80) {
           changed = true;
@@ -827,8 +828,11 @@ export default function App() {
         }
         return f;
       });
-      return changed ? next : prev;
-    });
+      if (changed) {
+        flyersRef.current = next;
+        setFlyers(next);
+      }
+    }
 
     const movedProjectiles = projectilesRef.current.map((p) => ({
       ...p,
@@ -878,7 +882,7 @@ export default function App() {
         isAbductingRef.current = true;
         setTimeout(() => {
           nextLevelRef.current();
-        }, 9000);
+        }, 4500);
         return;
       }
       if (currentLevelRef.current.number === 5 && !isMeteorCrashRef.current) {
@@ -922,28 +926,25 @@ export default function App() {
     // Direct DOM update for camera and player instead of setRenderState
     const camX = Math.max(
       0,
-      playerXRef.current - (isL ? 1200 : window.innerWidth) / 3,
+      playerXRef.current - (isL ? 1200 : winWRef.current) / 3,
     );
     const worldEl = document.getElementById("game-world");
     if (worldEl) worldEl.style.transform = `translateX(${-camX}px)`;
 
     const playerEl = document.getElementById("player-wrapper");
     if (playerEl) {
-      const groundY = window.innerWidth > window.innerHeight ? 70 : 120;
       playerEl.style.left = `${nX}px`;
       playerEl.style.bottom = `${groundY - nY}px`;
     }
 
     const ridingAnimalEl = document.getElementById("riding-animal");
     if (ridingAnimalEl) {
-      const groundY = window.innerWidth > window.innerHeight ? 70 : 120;
       ridingAnimalEl.style.left = `${nX - 10}px`;
       ridingAnimalEl.style.bottom = `${groundY - nY - 10}px`;
     }
 
     const fighterShipEl = document.getElementById("fighter-ship");
     if (fighterShipEl) {
-      const groundY = window.innerWidth > window.innerHeight ? 70 : 120;
       fighterShipEl.style.left = `${nX - 40}px`;
       fighterShipEl.style.bottom = `${groundY - nY - 8}px`;
     }
@@ -1447,7 +1448,7 @@ export default function App() {
                       style={{
                         left: `${playerXRef.current - 20}px`,
                         bottom: `${(isLandscape ? 70 : 120) - playerYRef.current - 20}px`,
-                        transform: `scale(${isLandscape ? (window.innerHeight < 500 ? 0.9 : 1.8) : 2.25})`,
+                        transform: `scale(${isLandscape ? (window.innerHeight < 500 ? 0.7 : 1.3) : 1.7})`,
                       }}
                     >
                       <Competitor
@@ -1650,7 +1651,7 @@ export default function App() {
                       left: `${playerXRef.current}px`,
                       bottom: `${(isLandscape ? 70 : 120) - playerYRef.current}px`,
                       transformOrigin: "bottom",
-                      transform: `scale(${(isFlying ? 0.9 : powerLevel === 2 ? 1.0 : powerLevel === 1 ? 1.0 : 0.8) * (isLandscape ? (currentIdx === 3 ? 1.8 : 1.05) : currentIdx === 3 ? 2.25 : 1)})`,
+                      transform: `scale(${(isFlying ? 0.9 : powerLevel === 2 ? 1.0 : powerLevel === 1 ? 1.0 : 0.8) * (isLandscape ? (currentIdx === 3 ? 1.3 : 1.05) : currentIdx === 3 ? 1.7 : 1)})`,
                     }}
                   >
                     <GeminiRunner
@@ -1763,7 +1764,7 @@ export default function App() {
               transition={
                 isAbducting
                   ? {
-                      duration: 6,
+                      duration: 4,
                       times: [0, 0.2, 0.8, 1],
                       ease: "easeInOut",
                     }
@@ -1774,7 +1775,7 @@ export default function App() {
             >
               <div className="relative">
                 {/* UFO Body */}
-                <div className="w-64 h-20 bg-slate-400 rounded-[100%] border-b-6 border-slate-600 shadow-[0_20px_50px_rgba(34,211,238,0.5)] relative z-20">
+                <div className="w-36 h-11 bg-slate-400 rounded-[100%] border-b-6 border-slate-600 shadow-[0_20px_50px_rgba(34,211,238,0.5)] relative z-20">
                   <div className="absolute top-2 left-1/2 -translate-x-1/2 w-32 h-10 bg-cyan-300/40 rounded-full blur-sm" />
 
                   {/* Abduction Hole (only visible when abducting) */}
@@ -1839,7 +1840,7 @@ export default function App() {
                   scale: [1, 1, 0.12, 0],
                 }}
                 transition={{
-                  duration: 6,
+                  duration: 4,
                   times: [0, 0.28, 0.82, 0.9],
                   ease: "easeInOut",
                 }}
@@ -1868,7 +1869,7 @@ export default function App() {
                   rotate: [0, 0, -20, 3, -14, 0, -8, 0],
                 }}
                 transition={{
-                  duration: 5,
+                  duration: 3.5,
                   times: [0, 0.2, 0.3, 0.46, 0.58, 0.72, 0.84, 1],
                   ease: "easeInOut",
                 }}
@@ -1886,13 +1887,6 @@ export default function App() {
               </motion.div>
             )}
 
-            {/* Fade to black → World 6 title card */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={isAbducting ? { opacity: [0, 0, 1, 1] } : { opacity: 0 }}
-              transition={{ times: [0, 0.64, 0.72, 1], duration: 9 }}
-              className="fixed inset-0 bg-black z-[9999] flex flex-col items-center justify-center"
-            ></motion.div>
           </div>
         )}
 
@@ -1911,7 +1905,7 @@ export default function App() {
             <div
               className="relative flex items-end"
               style={{
-                transform: "scale(1.3)",
+                transform: "scale(0.85)",
                 transformOrigin: "bottom right",
               }}
             >
@@ -2260,10 +2254,12 @@ export default function App() {
                 />
               </motion.div>
             ))}
-            {/* Big impact explosion at center */}
+            {/* Big impact explosion at ship position (~1/3 from left, lower area) */}
             <motion.div
-              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full blur-xl"
+              className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full blur-xl"
               style={{
+                left: `${winWRef.current / 3}px`,
+                bottom: isLandscape ? "80px" : "140px",
                 background:
                   "radial-gradient(circle, #fef3c7 0%, #f97316 40%, #dc2626 70%, transparent 100%)",
               }}

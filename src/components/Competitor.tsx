@@ -1433,22 +1433,16 @@ export const Competitor = ({
     return (
       <div className="relative flex flex-col items-center" style={{ width: "88px", height: "52px" }}>
         {/* Name badge */}
-        <motion.div
-          className="absolute -top-7 left-1/2 -translate-x-1/2 pointer-events-none z-50 whitespace-nowrap"
-          animate={{ y: [0, -2, 0] }}
-          transition={{ repeat: Infinity, duration: 1.2 }}
-        >
+        <div className="absolute -top-7 left-1/2 -translate-x-1/2 pointer-events-none z-50 whitespace-nowrap">
           <div className="bg-slate-900 text-cyan-400 text-[7px] px-1.5 py-0.5 rounded-sm font-black italic border border-cyan-500/50 uppercase">
             UNIT-{getName()}
           </div>
-        </motion.div>
+        </div>
 
-        {/* Main rotor */}
-        <motion.div
-          className="absolute bg-slate-300 origin-center rounded-full"
-          style={{ top: "2px", left: "50%", width: "80px", height: "3px", translateX: "-50%" }}
-          animate={{ rotate: [0, 360] }}
-          transition={{ repeat: Infinity, duration: 0.12, ease: "linear" }}
+        {/* Main rotor — CSS spin (compositor thread, no JS overhead) */}
+        <div
+          className="absolute bg-slate-300 origin-center rounded-full animate-spin"
+          style={{ top: "2px", left: "50%", width: "80px", height: "3px", translateX: "-50%", animationDuration: "0.2s" }}
         />
         <div
           className="absolute bg-slate-500 rounded-full"
@@ -1469,12 +1463,10 @@ export const Competitor = ({
             className="absolute border border-cyan-300/50 bg-cyan-400/20"
             style={{ left: "4px", top: "4px", width: "22px", height: "14px", borderRadius: "50% 20% 20% 50%" }}
           />
-          {/* Pilot blink */}
-          <motion.div
-            className="absolute rounded-full"
-            style={{ left: "8px", top: "8px", width: "5px", height: "5px", background: neonColor, boxShadow: `0 0 5px ${neonColor}` }}
-            animate={{ opacity: [1, 0.2, 1] }}
-            transition={{ repeat: Infinity, duration: 0.6 }}
+          {/* Pilot blink — CSS pulse */}
+          <div
+            className="absolute rounded-full animate-pulse"
+            style={{ left: "8px", top: "8px", width: "5px", height: "5px", background: neonColor, boxShadow: `0 0 5px ${neonColor}`, animationDuration: "0.6s" }}
           />
           {/* Missile pod */}
           <div className="absolute bottom-0 left-6 w-5 h-2 bg-red-700 border border-red-500 rounded-r-full" />
@@ -1485,17 +1477,15 @@ export const Competitor = ({
           className="absolute bg-slate-700 border-t border-slate-500"
           style={{ right: "0px", top: "50%", width: "20px", height: "4px", transform: "translateY(-50%)" }}
         />
-        {/* Tail rotor */}
-        <motion.div
-          className="absolute bg-slate-400 origin-center"
-          style={{ right: "0px", top: "50%", width: "2px", height: "16px", transform: "translateY(-50%)" }}
-          animate={{ rotate: [0, 360] }}
-          transition={{ repeat: Infinity, duration: 0.08, ease: "linear" }}
+        {/* Tail rotor — CSS spin */}
+        <div
+          className="absolute bg-slate-400 origin-center animate-spin"
+          style={{ right: "0px", top: "50%", width: "2px", height: "16px", transform: "translateY(-50%)", animationDuration: "0.12s" }}
         />
 
-        {/* Spotlight cone downward */}
-        <motion.div
-          className="absolute pointer-events-none"
+        {/* Spotlight cone downward — CSS pulse */}
+        <div
+          className="absolute pointer-events-none animate-pulse"
           style={{
             left: "28px",
             top: "42px",
@@ -1503,9 +1493,8 @@ export const Competitor = ({
             height: "40px",
             background: `linear-gradient(to bottom, ${neonColor}70, transparent)`,
             clipPath: "polygon(15% 0%, 85% 0%, 100% 100%, 0% 100%)",
+            animationDuration: "0.7s",
           }}
-          animate={{ opacity: [0.5, 1, 0.5] }}
-          transition={{ repeat: Infinity, duration: 0.7 }}
         />
       </div>
     );

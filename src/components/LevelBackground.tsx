@@ -908,7 +908,7 @@ export const LevelBackground = ({ level }: BackgroundProps) => {
           {/* Platforms with safety stripes */}
           <div className="absolute inset-0">
             {[...Array(10)].map((_, i) => {
-              const platformX = i * 1200 + 800;
+              const platformX = i * 1200 + 1100;
               return (
                 <div
                   key={`platform-${i}`}
