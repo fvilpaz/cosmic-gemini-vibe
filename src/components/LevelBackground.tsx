@@ -22,7 +22,7 @@ const getClipPath = (env: string, i: number) => {
   return "polygon(0% 100%, 25% 40%, 50% 70%, 75% 25%, 100% 100%)";
 };
 
-export const LevelBackground = ({ level }: BackgroundProps) => {
+export const LevelBackground = React.memo(({ level }: BackgroundProps) => {
   const starsRef = useRef<HTMLDivElement>(null);
   const midCloudsRef = useRef<HTMLDivElement>(null);
   const parallaxNodesRef = useRef<(HTMLDivElement | null)[]>([]);
@@ -198,11 +198,11 @@ export const LevelBackground = ({ level }: BackgroundProps) => {
             return (
               <motion.div
                 key={`firework-${i}`}
-                className="absolute w-2 h-2 rounded-full"
+                className="absolute w-2 h-2 rounded-full will-change-[transform,opacity]"
                 style={{
                   top: `${h}px`,
                   left: `${w}vw`,
-                  boxShadow: `0 0 10px ${colors[i % 7]}, 0 0 20px ${colors[i % 7]}, 0 0 40px ${colors[i % 7]}, 0 0 80px ${colors[i % 7]}`,
+                  boxShadow: `0 0 15px ${colors[i % 7]}, 0 0 30px ${colors[i % 7]}`,
                   backgroundColor: colors[i % 7],
                 }}
                 animate={{
@@ -226,7 +226,7 @@ export const LevelBackground = ({ level }: BackgroundProps) => {
             return (
               <motion.div
                 key={`confetti-${i}`}
-                className="absolute w-2 h-4"
+                className="absolute w-2 h-4 will-change-transform"
                 style={{
                   left: `${w}vw`,
                   backgroundColor: colors[i % 7],
@@ -253,7 +253,7 @@ export const LevelBackground = ({ level }: BackgroundProps) => {
               return (
               <motion.div
                 key={`human-${i}`}
-                className="text-white text-lg md:text-2xl drop-shadow-md"
+                className="text-white text-lg md:text-2xl drop-shadow-md will-change-transform"
                 animate={{ y: [0, -15, 0], rotate: [0, i % 2 === 0 ? 10 : -10, 0] }}
                 transition={{
                   duration: 0.4 + (i % 4) * 0.15,
@@ -1761,4 +1761,4 @@ export const LevelBackground = ({ level }: BackgroundProps) => {
       </motion.div>
     </AnimatePresence>
   );
-};
+});

@@ -25,10 +25,40 @@ import { cn } from "./lib/utils";
 const GRAVITY = 0.4;
 const JUMP_FORCE = -11;
 
-type GameState = "menu" | "interlevel" | "playing" | "gameover" | "complete";
+type GameState = "menu" | "guide" | "interlevel" | "playing" | "gameover" | "complete";
+
+const GuideAutoAdvance = ({ onComplete }: { onComplete: () => void }) => {
+  const [timeLeft, setTimeLeft] = useState(6);
+
+  useEffect(() => {
+    if (timeLeft <= 0) {
+      onComplete();
+      return;
+    }
+    const timer = setTimeout(() => {
+      setTimeLeft(prev => prev - 1);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [timeLeft, onComplete]);
+
+  return (
+    <div className="mt-8 flex flex-col items-center">
+      <p className="text-white/40 text-sm mb-2">Auto-starting in {timeLeft}...</p>
+      <div className="w-48 h-1 bg-white/10 rounded-full overflow-hidden">
+        <motion.div 
+          className="h-full bg-white"
+          initial={{ width: "100%" }}
+          animate={{ width: "0%" }}
+          transition={{ duration: 6, ease: "linear" }}
+        />
+      </div>
+    </div>
+  );
+};
 
 export default function App() {
   const [currentIdx, setCurrentIdx] = useState(-1);
+  const [targetLevel, setTargetLevel] = useState(0);
   const [gameState, setGameState] = useState<GameState>("menu");
 
   // High-performance Physics (using Refs to skip React state lag during calculation)
@@ -38,20 +68,53 @@ export default function App() {
 
   const [isJumping, setIsJumping] = useState(false);
   const [isLandscape, setIsLandscape] = useState(false);
+  const [isPortraitGameboy, setIsPortraitGameboy] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
       const w = window.innerWidth;
       const h = window.innerHeight;
       const isL = w > h;
-      // Global mobile landscape scale factor
-      const scaleBase = (isL && h < 500) ? Math.max(0.45, h / 750) : 1;
       
-      winWRef.current = w / scaleBase;
-      winHRef.current = h / scaleBase;
+      const isMobileLandscape = isL && h < 500;
+      const isMobilePortrait = !isL && w <= 768 && h > 500;
+      
+      let gameW = w;
+      let gameH = h;
+      let scaleBase = 1;
+      let sidebarWidth = 0;
+
+      if (isMobileLandscape) {
+        gameH = h;
+        scaleBase = Math.max(0.45, gameH / 750);
+        const requiredSidebar = 105; 
+        const maxW = w - (requiredSidebar * 2);
+        const maxRatio = h * 1.8; 
+        gameW = Math.min(maxW, maxRatio);
+        sidebarWidth = (w - gameW) / 2;
+      } else if (isMobilePortrait) {
+        // Gameboy style: game at top, controls at bottom
+        // Game takes a portion of the top screen
+        gameW = w;
+        const maxGameH = Math.min(h - 220, w * 1.3); // leaving at least 220px for controls
+        gameH = maxGameH;
+        scaleBase = Math.max(0.45, gameH / 750);
+      } else {
+        gameW = w;
+        gameH = h;
+        scaleBase = 1;
+      }
+
+      winWRef.current = gameW / scaleBase;
+      winHRef.current = gameH / scaleBase;
       setIsLandscape(isL);
-      document.documentElement.style.setProperty('--mobile-scale', scaleBase.toString());
-      document.documentElement.style.setProperty('--mobile-inv-scale', (1 / scaleBase).toString());
+      setIsPortraitGameboy(isMobilePortrait);
+      
+      document.documentElement.style.setProperty("--mobile-scale", scaleBase.toString());
+      document.documentElement.style.setProperty("--mobile-inv-scale", (1 / scaleBase).toString());
+      document.documentElement.style.setProperty("--game-height-px", `${gameH}px`);
+      document.documentElement.style.setProperty("--game-width-px", `${gameW}px`);
+      document.documentElement.style.setProperty("--sidebar-width-px", `${sidebarWidth}px`);
     };
     handleResize();
     window.addEventListener("resize", handleResize);
@@ -1162,12 +1225,8 @@ export default function App() {
   }, []);
 
   const handleStart = () => {
-    setCurrentIdx(0);
-    startLevel(0);
-    setGameState("interlevel");
-    setTimeout(() => {
-      document.getElementById("game-container")?.focus();
-    }, 100);
+    setTargetLevel(0);
+    setGameState("guide");
   };
 
   const handleReset = () => {
@@ -1179,9 +1238,17 @@ export default function App() {
   };
 
   const handleJumpToLevel = (idx: number) => {
-    setCurrentIdx(idx);
-    startLevel(idx);
+    setTargetLevel(idx);
+    setGameState("guide");
   };
+
+  const proceedFromGuide = useCallback(() => {
+    setCurrentIdx(targetLevel);
+    startLevel(targetLevel);
+    setTimeout(() => {
+      document.getElementById("game-container")?.focus();
+    }, 100);
+  }, [targetLevel, startLevel]);
 
   const cameraX = Math.max(
     0,
@@ -1195,7 +1262,8 @@ export default function App() {
       id="game-container"
       tabIndex={0}
       className={cn(
-        "fixed w-screen h-[100dvh] inset-0 bg-[#050505] text-white font-sans overflow-hidden select-none focus:outline-none",
+        "fixed w-screen h-[100dvh] inset-0 bg-[#050505] text-white font-sans overflow-hidden select-none focus:outline-none flex items-center",
+        isPortraitGameboy ? "flex-col justify-start" : "justify-center",
         gameState === "playing" ? "touch-none" : "touch-auto"
       )}
       onPointerDown={handleInteraction}
@@ -1206,9 +1274,9 @@ export default function App() {
       <div 
         style={{
           transform: `scale(var(--mobile-scale, 1))`,
-          transformOrigin: 'top left',
-          width: `calc(100% * var(--mobile-inv-scale, 1))`,
-          height: `calc(100% * var(--mobile-inv-scale, 1))`,
+          transformOrigin: isPortraitGameboy ? 'top center' : 'center',
+          width: `calc(var(--game-width-px, 100%) * var(--mobile-inv-scale, 1))`,
+          height: `calc(var(--game-height-px, 100dvh) * var(--mobile-inv-scale, 1))`,
           position: 'relative'
         }}
       >
@@ -1220,7 +1288,7 @@ export default function App() {
           className="relative overflow-hidden pointer-events-auto"
         >
           {/* Background Parallax */}
-          {currentLevel && <LevelBackground level={currentLevel} />}
+          {currentLevel && gameState !== "complete" && gameState !== "menu" && <LevelBackground level={currentLevel} />}
 
           {/* World Elements */}
           <div className="absolute inset-0 z-10 pointer-events-none">
@@ -1397,7 +1465,7 @@ export default function App() {
                           style={{
                             left: `${enemy.x}px`,
                             bottom: `${100 - enemy.y}px`,
-                            transform: `scale(${(enemy.size || 1) * (currentIdx === 9 ? 0.65 : 0.95)}) ${enemy.behavior === "roll" ? `rotate(${enemy.phase}deg)` : ""}`,
+                            transform: `scale(${(enemy.size || 1) * (isLandscape ? 0.85 : 0.95) * (currentIdx === 9 ? 0.65 : 1.0)}) ${enemy.behavior === "roll" ? `rotate(${enemy.phase}deg)` : ""}`,
                             transformOrigin: "bottom",
                             filter: "drop-shadow(0 2px 10px rgba(0,0,0,0.9))",
                           }}
@@ -2349,156 +2417,9 @@ export default function App() {
             </div>
           </motion.div>
         )}
-
-        {/* TOUCH CONTROLS (Only visible on small screens) */}
-        {gameState === "playing" && (
-          <div className="fixed bottom-6 inset-x-0 flex justify-between px-6 z-[60] pointer-events-none lg:hidden">
-            <div className="flex gap-4 pointer-events-auto items-end">
-              <button
-                className="w-16 h-16 bg-white/10 backdrop-blur-md border border-white/20 rounded-full flex items-center justify-center active:scale-90 active:bg-white/30 text-white text-2xl select-none shadow-xl"
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  keysPressed.current["ArrowLeft"] = true;
-                }}
-                onPointerUp={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  keysPressed.current["ArrowLeft"] = false;
-                }}
-                onPointerLeave={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  keysPressed.current["ArrowLeft"] = false;
-                }}
-              >
-                ←
-              </button>
-              <button
-                className="w-16 h-16 bg-white/10 backdrop-blur-md border border-white/20 rounded-full flex items-center justify-center active:scale-90 active:bg-white/30 text-white text-2xl select-none shadow-xl"
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  keysPressed.current["ArrowRight"] = true;
-                }}
-                onPointerUp={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  keysPressed.current["ArrowRight"] = false;
-                }}
-                onPointerLeave={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  keysPressed.current["ArrowRight"] = false;
-                }}
-              >
-                →
-              </button>
-            </div>
-            <div className="flex gap-4 pointer-events-auto items-end">
-              {(powerLevel > 0 ||
-                currentIdx === 3 ||
-                currentIdx === 4 ||
-                currentIdx === 5 ||
-                currentIdx === 7) && (
-                <button
-                  className="w-16 h-16 bg-blue-500/40 backdrop-blur-md border border-blue-400/50 rounded-full flex items-center justify-center active:scale-90 active:bg-blue-500/60 text-white text-2xl select-none z-[75] shadow-xl"
-                  onPointerDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    shoot();
-                  }}
-                  onTouchStart={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    shoot();
-                  }}
-                >
-                  {currentIdx === 3
-                    ? "🔫"
-                    : currentIdx === 4 || currentIdx === 5 || currentIdx === 7
-                      ? "⚡"
-                      : "🔥"}
-                </button>
-              )}
-              <div className="flex flex-col gap-2">
-                {isFlying && (
-                  <button
-                    className="w-20 h-20 bg-white/10 backdrop-blur-md border border-white/20 rounded-full flex items-center justify-center active:scale-95 active:bg-white/30 text-white font-black select-none z-[70] shadow-xl text-sm"
-                    onPointerDown={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      keysPressed.current["ArrowDown"] = true;
-                    }}
-                    onPointerUp={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      keysPressed.current["ArrowDown"] = false;
-                    }}
-                    onPointerLeave={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      keysPressed.current["ArrowDown"] = false;
-                    }}
-                    onTouchStart={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      keysPressed.current["ArrowDown"] = true;
-                    }}
-                    onTouchEnd={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      keysPressed.current["ArrowDown"] = false;
-                    }}
-                  >
-                    DN
-                  </button>
-                )}
-                <button
-                  className="w-20 h-20 bg-white/20 backdrop-blur-md border border-white/40 rounded-full flex items-center justify-center active:scale-95 active:bg-white/40 text-white font-black select-none z-[70] shadow-xl text-sm"
-                  onPointerDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (isFlying) {
-                      keysPressed.current["TouchJump"] = true;
-                    } else {
-                      triggerJump();
-                    }
-                  }}
-                  onPointerUp={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    keysPressed.current["TouchJump"] = false;
-                  }}
-                  onPointerLeave={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    keysPressed.current["TouchJump"] = false;
-                  }}
-                  onTouchStart={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (isFlying) {
-                      keysPressed.current["TouchJump"] = true;
-                    } else {
-                      triggerJump();
-                    }
-                  }}
-                  onTouchEnd={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    keysPressed.current["TouchJump"] = false;
-                  }}
-                >
-                  {isFlying ? "UP" : "JMP"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* HUD Layer */}
+        {/* HUD Layer */}
       {gameState === "playing" && currentLevel && (
         <>
           <div className="fixed top-12 left-4 z-[120] pointer-events-auto">
@@ -2562,17 +2483,23 @@ export default function App() {
                 style={{ fontSize: "clamp(1rem, 4vmin, 3rem)" }}
                 className="font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-b from-white to-gray-600 italic uppercase shrink-0 leading-none"
               >
-                VIBE GAME
+                Google I/O 2026
               </h1>
+              <div 
+                style={{ fontSize: "clamp(1.5rem, 5vmin, 4rem)" }}
+                className="font-black tracking-widest text-blue-500 uppercase shrink-0 leading-none mt-2 md:mt-4 mb-2 md:mb-6 drop-shadow-[0_0_15px_rgba(59,130,246,0.3)]"
+              >
+                Code the Countdown
+              </div>
               <p
                 style={{ fontSize: "clamp(0.5rem, 2vmin, 1.5rem)" }}
-                className="text-gray-400 font-light max-w-2xl mx-auto my-1 md:my-6 leading-relaxed shrink-0 text-center px-4"
+                className="text-gray-300 font-medium max-w-2xl mx-auto my-1 md:my-6 leading-relaxed shrink-0 text-center px-4"
               >
-                Run through the AI Cosmos. Dodge the competitors.
+                Help us countdown the AI Cosmos from 10 to 1!
                 <br />
-                Collect{" "}
-                <span className="text-yellow-400 font-bold">Dollars</span> to
-                fire <span className="text-blue-400 font-bold">Tokens</span>.
+                <span className="text-gray-500 text-sm font-light mt-2 block">
+                  Dodge competitors. Collect <span className="text-yellow-400 font-bold">Dollars</span>. Fire <span className="text-blue-400 font-bold">Tokens</span>.
+                </span>
               </p>
               <button
                 onClick={(e) => {
@@ -2581,7 +2508,7 @@ export default function App() {
                 }}
                 className="mt-2 md:mt-4 px-6 md:px-8 py-3 md:py-4 bg-blue-600 text-white font-black text-lg md:text-3xl rounded-full hover:bg-blue-500 hover:scale-110 active:scale-95 transition-all shadow-2xl flex items-center gap-3"
               >
-                START DISCOVERY{" "}
+                START COUNTDOWN{" "}
                 <ChevronRight className="w-6 h-6 md:w-8 md:h-8" />
               </button>
               <div className="mt-6 flex flex-col items-center gap-2">
@@ -2607,6 +2534,65 @@ export default function App() {
                   ))}
                 </div>
               </div>
+            </div>
+          </motion.div>
+        )}
+
+        {gameState === "guide" && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 w-full h-full overflow-hidden flex flex-col items-center justify-center z-[100] bg-black/95 backdrop-blur-3xl"
+          >
+            <div className="absolute inset-0 max-w-5xl mx-auto overflow-hidden pointer-events-none opacity-20">
+              <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-blue-600 rounded-full blur-[150px]" />
+              <div className="absolute bottom-1/4 left-1/4 w-96 h-96 bg-purple-600 rounded-full blur-[150px]" />
+            </div>
+
+            <div className="relative z-10 w-full max-w-4xl px-4 flex flex-col items-center">
+              <h2 className="text-3xl md:text-5xl font-black text-white uppercase tracking-tight mb-8 md:mb-12">
+                — How to Play —
+              </h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-2xl mb-12">
+                <div className="bg-white/5 border border-white/10 rounded-3xl p-6 md:p-8 flex flex-col items-center text-center shadow-xl">
+                  <div className="h-16 w-16 mb-4 flex items-center justify-center bg-blue-500/20 text-blue-400 rounded-full">
+                    <MousePointer2 className="w-8 h-8" />
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-2">JUMP / HOVER</h3>
+                  <p className="text-white/60 text-sm mb-4">Spacebar / Up Arrow or tap left side of screen.</p>
+                  <div className="flex gap-2">
+                    <span className="px-3 py-1 bg-white/10 rounded-md text-xs font-mono text-white/80">SPACE</span>
+                    <span className="px-3 py-1 bg-white/10 rounded-md text-xs font-mono text-white/80">↑</span>
+                    <span className="px-3 py-1 bg-white/10 rounded-md text-xs font-mono text-white/80">TAP</span>
+                  </div>
+                </div>
+
+                <div className="bg-white/5 border border-white/10 rounded-3xl p-6 md:p-8 flex flex-col items-center text-center shadow-xl">
+                  <div className="h-16 w-16 mb-4 flex items-center justify-center bg-yellow-500/20 text-yellow-400 rounded-full">
+                    <Sparkles className="w-8 h-8" />
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-2">SHOOT TOKENS</h3>
+                  <p className="text-white/60 text-sm mb-4">Press 'F' or tap the right-side fire button. Costs 1 Dollar.</p>
+                  <div className="flex gap-2">
+                    <span className="px-3 py-1 bg-white/10 rounded-md text-xs font-mono text-white/80">F</span>
+                    <span className="px-3 py-1 bg-white/10 rounded-md text-xs font-mono text-white/80">TAP</span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  proceedFromGuide();
+                }}
+                className="px-8 md:px-12 py-4 md:py-5 bg-white text-black font-black text-xl md:text-2xl rounded-full hover:bg-gray-200 hover:scale-105 active:scale-95 transition-all shadow-[0_0_40px_rgba(255,255,255,0.3)] flex items-center gap-3"
+              >
+                PROCEED TO MISSION <ArrowRight className="w-6 h-6 md:w-8 md:h-8" />
+              </button>
+
+              <GuideAutoAdvance onComplete={proceedFromGuide} />
             </div>
           </motion.div>
         )}
@@ -2797,15 +2783,17 @@ export default function App() {
         )}
 
         {gameState === "complete" && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-            <motion.div 
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/95"
+          >
+            <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className="relative w-full max-w-2xl bg-white/10 backdrop-blur-xl border border-white/20 rounded-[40px] p-8 md:p-12 text-center shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden"
+              transition={{ type: "spring", bounce: 0.5 }}
+              className="relative w-full max-w-2xl bg-slate-900 border border-white/10 rounded-[40px] p-8 md:p-12 text-center shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden"
             >
-              {/* Animated Background Glows */}
-              <div className="absolute -top-24 -left-24 w-64 h-64 bg-blue-500/20 rounded-full blur-[80px]" />
-              <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-red-500/20 rounded-full blur-[80px]" />
               
               <div className="relative z-10 flex flex-col items-center">
                 {/* Modernized Google Logo Display */}
@@ -2847,7 +2835,7 @@ export default function App() {
                 </motion.button>
               </div>
             </motion.div>
-          </div>
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -2866,6 +2854,166 @@ export default function App() {
       </AnimatePresence>
     
       </div>
+
+      {/* TOUCH CONTROLS */}
+      {gameState === "playing" && (
+        <div className="fixed inset-0 z-[10000] pointer-events-none lg:hidden">
+          {!isPortraitGameboy ? (
+            <>
+              {/* Left Sidebar (Movement D-Pad) */}
+              <div 
+                className="absolute top-0 bottom-0 left-0 flex flex-col justify-end items-center pointer-events-auto pb-6 sm:pb-10"
+                style={{ width: `var(--sidebar-width-px)` }}
+              >
+                <div className="flex flex-col items-center gap-1">
+                  <button
+                    className="w-10 h-10 sm:w-12 sm:h-12 bg-zinc-800/90 border-2 border-zinc-600 rounded-full flex items-center justify-center active:scale-95 active:bg-zinc-700 text-white text-lg select-none shadow-[0_0_15px_rgba(0,0,0,0.8)]"
+                    onPointerDown={(e) => { e.preventDefault(); keysPressed.current["ArrowUp"] = true; }}
+                    onPointerUp={(e) => { e.preventDefault(); keysPressed.current["ArrowUp"] = false; }}
+                    onPointerLeave={(e) => { e.preventDefault(); keysPressed.current["ArrowUp"] = false; }}
+                  >
+                    ↑
+                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      className="w-10 h-10 sm:w-12 sm:h-12 bg-zinc-800/90 border-2 border-zinc-600 rounded-full flex items-center justify-center active:scale-95 active:bg-zinc-700 text-white text-lg select-none shadow-[0_0_15px_rgba(0,0,0,0.8)]"
+                      onPointerDown={(e) => { e.preventDefault(); keysPressed.current["ArrowLeft"] = true; }}
+                      onPointerUp={(e) => { e.preventDefault(); keysPressed.current["ArrowLeft"] = false; }}
+                      onPointerLeave={(e) => { e.preventDefault(); keysPressed.current["ArrowLeft"] = false; }}
+                    >
+                      ←
+                    </button>
+                    <button
+                      className="w-10 h-10 sm:w-12 sm:h-12 bg-zinc-800/90 border-2 border-zinc-600 rounded-full flex items-center justify-center active:scale-95 active:bg-zinc-700 text-white text-lg select-none shadow-[0_0_15px_rgba(0,0,0,0.8)]"
+                      onPointerDown={(e) => { e.preventDefault(); keysPressed.current["ArrowRight"] = true; }}
+                      onPointerUp={(e) => { e.preventDefault(); keysPressed.current["ArrowRight"] = false; }}
+                      onPointerLeave={(e) => { e.preventDefault(); keysPressed.current["ArrowRight"] = false; }}
+                    >
+                      →
+                    </button>
+                  </div>
+                  <button
+                    className="w-10 h-10 sm:w-12 sm:h-12 bg-zinc-800/90 border-2 border-zinc-600 rounded-full flex items-center justify-center active:scale-95 active:bg-zinc-700 text-white text-lg select-none shadow-[0_0_15px_rgba(0,0,0,0.8)]"
+                    onPointerDown={(e) => { e.preventDefault(); keysPressed.current["ArrowDown"] = true; }}
+                    onPointerUp={(e) => { e.preventDefault(); keysPressed.current["ArrowDown"] = false; }}
+                    onPointerLeave={(e) => { e.preventDefault(); keysPressed.current["ArrowDown"] = false; }}
+                  >
+                    ↓
+                  </button>
+                </div>
+              </div>
+
+              {/* Right Sidebar (Action) */}
+              <div 
+                className="absolute top-0 bottom-0 right-0 flex flex-col justify-end items-center pointer-events-auto pb-6 sm:pb-10"
+                style={{ width: `var(--sidebar-width-px)` }}
+              >
+                <div className="flex flex-col gap-4 items-center">
+                  {(powerLevel > 0 || currentIdx === 3 || currentIdx === 4 || currentIdx === 5 || currentIdx === 7) && (
+                    <button
+                      className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-900/90 border-2 border-blue-600 rounded-full flex items-center justify-center active:scale-90 text-white text-[9px] sm:text-xs font-black uppercase select-none shadow-[0_0_15px_rgba(30,58,138,0.5)]"
+                      onPointerDown={(e) => { e.preventDefault(); shoot(); }}
+                    >
+                      SHT
+                    </button>
+                  )}
+                  <button
+                    className="w-14 h-14 sm:w-16 sm:h-16 bg-zinc-800/95 border-2 border-zinc-500 rounded-full flex items-center justify-center active:scale-90 text-white font-black text-sm sm:text-lg uppercase select-none shadow-[0_0_20px_rgba(0,0,0,0.9)]"
+                    onPointerDown={(e) => { e.preventDefault(); triggerJump(); }}
+                  >
+                    JMP
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Portrait Gameboy Overlay */}
+              <div 
+                className="absolute left-0 right-0 bottom-0 flex justify-between items-center pointer-events-auto px-6 sm:px-12"
+                style={{ height: `calc(100dvh - var(--game-height-px))` }}
+              >
+                {/* D-Pad on Left */}
+                <div className="flex flex-col items-center gap-1 md:scale-125 origin-bottom-left">
+                  <button
+                    className="w-12 h-12 bg-zinc-800/90 border-2 border-zinc-600 rounded-full flex items-center justify-center active:scale-95 active:bg-zinc-700 text-white text-xl select-none shadow-[0_0_15px_rgba(0,0,0,0.8)]"
+                    onPointerDown={(e) => { e.preventDefault(); keysPressed.current["ArrowUp"] = true; }}
+                    onPointerUp={(e) => { e.preventDefault(); keysPressed.current["ArrowUp"] = false; }}
+                    onPointerLeave={(e) => { e.preventDefault(); keysPressed.current["ArrowUp"] = false; }}
+                  >
+                    ↑
+                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      className="w-12 h-12 bg-zinc-800/90 border-2 border-zinc-600 rounded-full flex items-center justify-center active:scale-95 active:bg-zinc-700 text-white text-xl select-none shadow-[0_0_15px_rgba(0,0,0,0.8)]"
+                      onPointerDown={(e) => { e.preventDefault(); keysPressed.current["ArrowLeft"] = true; }}
+                      onPointerUp={(e) => { e.preventDefault(); keysPressed.current["ArrowLeft"] = false; }}
+                      onPointerLeave={(e) => { e.preventDefault(); keysPressed.current["ArrowLeft"] = false; }}
+                    >
+                      ←
+                    </button>
+                    <button
+                      className="w-12 h-12 bg-zinc-800/90 border-2 border-zinc-600 rounded-full flex items-center justify-center active:scale-95 active:bg-zinc-700 text-white text-xl select-none shadow-[0_0_15px_rgba(0,0,0,0.8)]"
+                      onPointerDown={(e) => { e.preventDefault(); keysPressed.current["ArrowRight"] = true; }}
+                      onPointerUp={(e) => { e.preventDefault(); keysPressed.current["ArrowRight"] = false; }}
+                      onPointerLeave={(e) => { e.preventDefault(); keysPressed.current["ArrowRight"] = false; }}
+                    >
+                      →
+                    </button>
+                  </div>
+                  <button
+                    className="w-12 h-12 bg-zinc-800/90 border-2 border-zinc-600 rounded-full flex items-center justify-center active:scale-95 active:bg-zinc-700 text-white text-xl select-none shadow-[0_0_15px_rgba(0,0,0,0.8)]"
+                    onPointerDown={(e) => { e.preventDefault(); keysPressed.current["ArrowDown"] = true; }}
+                    onPointerUp={(e) => { e.preventDefault(); keysPressed.current["ArrowDown"] = false; }}
+                    onPointerLeave={(e) => { e.preventDefault(); keysPressed.current["ArrowDown"] = false; }}
+                  >
+                    ↓
+                  </button>
+                </div>
+                
+                {/* Action buttons on Right */}
+                <div className="flex justify-end gap-3 items-center md:scale-125 origin-bottom-right" style={{ transform: 'rotate(-15deg)' }}>
+                  {(powerLevel > 0 || currentIdx === 3 || currentIdx === 4 || currentIdx === 5 || currentIdx === 7) ? (
+                    <>
+                      <button
+                        className="w-14 h-14 bg-blue-900/90 border-2 border-blue-600 rounded-full flex items-center justify-center active:scale-90 text-white text-sm font-black uppercase select-none shadow-[0_0_15px_rgba(30,58,138,0.5)] mt-8"
+                        onPointerDown={(e) => { e.preventDefault(); shoot(); }}
+                      >
+                        SHT
+                      </button>
+                      <button
+                        className="w-16 h-16 bg-zinc-800/95 border-2 border-zinc-500 rounded-full flex items-center justify-center active:scale-90 text-white font-black text-lg uppercase select-none shadow-[0_0_20px_rgba(0,0,0,0.9)] mb-8"
+                        onPointerDown={(e) => { e.preventDefault(); triggerJump(); }}
+                      >
+                        JMP
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      className="w-20 h-20 bg-zinc-800/95 border-2 border-zinc-500 rounded-full flex items-center justify-center active:scale-90 text-white font-black text-2xl uppercase select-none shadow-[0_0_20px_rgba(0,0,0,0.9)]"
+                      onPointerDown={(e) => { e.preventDefault(); triggerJump(); }}
+                    >
+                      JMP
+                    </button>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Portrait Warning Overlay for Mobile */}
+      {(!isLandscape && !isPortraitGameboy) && gameState !== "menu" && (
+        <div className="fixed inset-0 z-[100000] bg-[#050505] flex flex-col items-center justify-center text-center p-8 lg:hidden touch-none pointer-events-auto">
+          <RotateCcw className="w-20 h-20 text-blue-500 mb-8" />
+          <h2 className="text-3xl sm:text-4xl font-black text-white mb-4 uppercase tracking-wider">Rotate Device</h2>
+          <p className="text-zinc-400 text-lg sm:text-xl max-w-sm">
+            Please rotate your phone to landscape mode to play this game.
+          </p>
+        </div>
+      )}
+
 </main>
   );
 }
