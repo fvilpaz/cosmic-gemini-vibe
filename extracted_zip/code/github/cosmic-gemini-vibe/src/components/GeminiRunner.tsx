@@ -55,7 +55,6 @@ export const GeminiRunner = ({
   return (
     <motion.div 
       className="relative w-12 h-14 flex flex-col items-center"
-      style={{ transformOrigin: "bottom center" }}
       animate={{ 
         scale: isSitting ? 1.5 : scale,
         y: isFlying ? [0, -10, 0] : (isSitting ? 20 : 0),

@@ -28,7 +28,6 @@ export type CompetitorType =
   | "mistral"
   | "perplexity";
 export type CompetitorVariant =
-  | "ghost"
   | "zombie"
   | "werewolf"
   | "ufo"
@@ -49,10 +48,7 @@ export type CompetitorVariant =
   | "wrench"
   | "gadget"
   | "alien"
-  | "helicopter"
-  | "agent"
-  | "octopus"
-  | "jellyfish";
+  | "helicopter";
 
 interface CompetitorProps {
   type: CompetitorType;
@@ -77,7 +73,19 @@ export const Competitor = ({
   const isPrompt = type === "prompt";
   const isHeadOnly = behavior === "roll" || behavior === "bounce";
 
-  const getBrandIcon = () => {
+  const getIcon = () => {
+    if (variant === "fish") return <Fish className="w-4 h-4 text-cyan-200" />;
+    if (variant === "ufo")
+      return <Rocket className="w-4 h-4 text-purple-200" />;
+    if (variant === "cow")
+      return <div className="text-[10px] font-black tracking-tighter">MOO</div>;
+    if (variant === "sheep")
+      return <div className="text-[10px] font-black tracking-tighter">BAA</div>;
+    if (variant === "pig")
+      return (
+        <div className="text-[10px] font-black tracking-tighter">OINK</div>
+      );
+
     switch (type) {
       case "gpt":
         return (
@@ -132,61 +140,6 @@ export const Competitor = ({
     }
   };
 
-  const getIcon = () => {
-    if (variant === "ghost")
-      return (
-        <div className="relative w-full h-full flex flex-col items-center">
-          {/* Classic Ghost Sheet Shape */}
-          <motion.div 
-            className="w-11 h-13 bg-white/80 rounded-t-full relative shadow-[0_0_30px_rgba(255,255,255,0.3)] backdrop-blur-sm"
-            animate={{ 
-              y: [0, -8, 0],
-              x: [-2, 2, -2],
-              rotate: [-2, 2, -2]
-            }}
-            transition={{ 
-              repeat: Infinity, 
-              duration: 2.5,
-              ease: "easeInOut"
-            }}
-          >
-             {/* Spooky Glowing Eyes */}
-             <div className="absolute top-4 left-2.5 w-1.5 h-1.5 bg-cyan-400 rounded-full shadow-[0_0_8px_#22d3ee]" />
-             <div className="absolute top-4 right-2.5 w-1.5 h-1.5 bg-cyan-400 rounded-full shadow-[0_0_8px_#22d3ee]" />
-             
-             {/* Flowing bottom edge */}
-             <div className="absolute -bottom-2 inset-x-0 h-4 flex">
-                {[...Array(4)].map((_, i) => (
-                  <motion.div 
-                    key={i} 
-                    className="flex-1 h-full bg-white/80 rounded-full -mt-2" 
-                    animate={{ scaleY: [1, 1.3, 1] }}
-                    transition={{ repeat: Infinity, duration: 1.5, delay: i * 0.2 }}
-                  />
-                ))}
-             </div>
-          </motion.div>
-          {/* Internal Icon for Brand ID - No recursion here! */}
-          <div className="absolute top-1 left-1/2 -translate-x-1/2 opacity-20 scale-50 pointer-events-none mix-blend-overlay">
-            {getBrandIcon()}
-          </div>
-        </div>
-      );
-    if (variant === "fish") return <Fish className="w-4 h-4 text-cyan-200" />;
-    if (variant === "ufo")
-      return <Rocket className="w-4 h-4 text-purple-200" />;
-    if (variant === "cow")
-      return <div className="text-[10px] font-black tracking-tighter">MOO</div>;
-    if (variant === "sheep")
-      return <div className="text-[10px] font-black tracking-tighter">BAA</div>;
-    if (variant === "pig")
-      return (
-        <div className="text-[10px] font-black tracking-tighter">OINK</div>
-      );
-
-    return getBrandIcon();
-  };
-
   const getName = () => {
     const baseName =
       type === "gpt"
@@ -208,14 +161,12 @@ export const Competitor = ({
                       : type === "prompt"
                         ? "PROMPT"
                         : "";
+    if (variant === "target") return baseName;
     if (variant === "zombie") return `ZOMBIE ${baseName}`;
-    if (variant === "ghost") return `GHOST OF ${baseName}`;
     if (variant === "werewolf") return `WERE-${baseName}`;
     if (variant === "ufo") return `ALIEN ${baseName}`;
     if (variant === "alien") return `ALIEN ${baseName}`;
     if (variant === "fish") return `AQUA ${baseName}`;
-    if (variant === "octopus") return `DEEP ${baseName}`;
-    if (variant === "jellyfish") return `TOXIC ${baseName}`;
     if (variant === "cow") return `MAD ${baseName}`;
     if (variant === "horse") return `WILD HORSE`;
     if (variant === "sheep") return `CRAZY ${baseName}`;
@@ -226,24 +177,19 @@ export const Competitor = ({
     if (variant === "flask") return "ACID FLASK";
     if (variant === "wrench") return "PLASMA WRENCH";
     if (variant === "gadget") return "GLITCH GADGET";
-    if (variant === "agent") return `AGENT ${baseName}`;
-    if (variant === "professor") return "DOCTOR LOCO";
+    if (variant === "professor") return "MAD PROFESSOR";
     return baseName;
   };
 
   const getColors = () => {
     if (type === "prompt")
       return "from-white to-neutral-300 border-neutral-400";
-    if (variant === "agent")
-      return "from-[#002200] to-black border-emerald-800 shadow-[0_0_15px_rgba(16,185,129,0.3)]";
     if (variant === "zombie")
       return type === "gpt"
         ? "from-green-800 to-black border-lime-500 shadow-lime-500/20"
         : type === "claude"
           ? "from-teal-800 to-black border-teal-500 shadow-teal-500/20"
           : "from-emerald-900 to-black border-emerald-500 shadow-emerald-500/20";
-    if (variant === "ghost")
-      return "from-white/40 via-blue-50/20 to-white/10 border-transparent shadow-none";
     if (variant === "werewolf")
       return type === "gpt"
         ? "from-stone-600 to-black border-stone-400 shadow-orange-500/20"
@@ -254,10 +200,6 @@ export const Competitor = ({
       return "from-fuchsia-900 via-purple-900 to-black border-fuchsia-500 shadow-fuchsia-500/40 rounded-full";
     if (variant === "fish")
       return "from-cyan-600 via-blue-800 to-black border-cyan-400 shadow-cyan-500/30 rounded-r-3xl rounded-l-md";
-    if (variant === "octopus")
-      return "from-purple-600 via-purple-800 to-black border-purple-400 shadow-purple-500/30 rounded-t-full rounded-b-xl";
-    if (variant === "jellyfish")
-      return "from-pink-400/80 via-pink-600/80 to-black border-pink-300 shadow-pink-500/50 rounded-t-full";
     if (variant === "missile")
       return "from-red-600 via-orange-600 to-black border-red-500 shadow-red-500/50 rounded-r-full rounded-l-md";
     if (variant === "professor")
@@ -295,7 +237,7 @@ export const Competitor = ({
 
   if (variant === "professor") {
     return (
-      <div className="relative w-16 h-16 flex flex-col items-center origin-bottom">
+      <div className="relative w-16 h-16 flex flex-col items-center">
         <motion.div
           className="absolute -top-10 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none z-50 delay-100"
           animate={{ scale: [1, 1.1, 1], y: [0, -2, 0] }}
@@ -414,7 +356,7 @@ export const Competitor = ({
         {/* Legs - very thin and crouched */}
         <div className="absolute bottom-0 right-4 flex gap-2 z-10 w-6 justify-between">
           <motion.div
-            className="w-1.5 h-6 bg-slate-800 border border-black origin-top rounded-b-sm"
+            className="w-1.5 h-4 bg-slate-800 border border-black origin-top rounded-b-sm"
             animate={isMoving ? { rotate: [-30, 40] } : {}}
             transition={{
               repeat: Infinity,
@@ -422,10 +364,10 @@ export const Competitor = ({
               repeatType: "mirror",
             }}
           >
-            <div className="absolute bottom-0 -right-1 w-4 h-2 bg-[#8B4513] border border-black rounded-r-full shadow-sm" />
+            <div className="absolute bottom-0 -right-1 w-4 h-2 bg-[#8B4513] border border-black rounded-r-full" />
           </motion.div>
           <motion.div
-            className="w-1.5 h-6 bg-slate-800 border border-black origin-top rounded-b-sm"
+            className="w-1.5 h-4 bg-slate-800 border border-black origin-top rounded-b-sm"
             animate={isMoving ? { rotate: [40, -30] } : {}}
             transition={{
               repeat: Infinity,
@@ -434,87 +376,11 @@ export const Competitor = ({
               delay: 0.1,
             }}
           >
-            <div className="absolute bottom-0 -right-1 w-4 h-2 bg-[#8B4513] border border-black rounded-r-full shadow-sm" />
+            <div className="absolute bottom-0 -right-1 w-4 h-2 bg-[#8B4513] border border-black rounded-r-full" />
           </motion.div>
         </div>
             </div>
     </div>
-    );
-  }
-
-  if (variant === "agent") {
-    return (
-      <div className="relative w-16 h-20 flex flex-col items-center justify-end scale-90 landscape:scale-100 origin-bottom">
-        <motion.div
-           className="absolute -top-6 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none z-50 min-w-max"
-           animate={{ y: [0, -2, 0] }}
-           transition={{ repeat: Infinity, duration: 1.5 }}
-        >
-           <div className="bg-black/90 text-emerald-500 text-[8px] px-2 py-0.5 rounded border border-emerald-800/50 uppercase shadow-[0_0_10px_rgba(16,185,129,0.3)] flex items-center justify-center font-mono">
-              {getName()}
-           </div>
-        </motion.div>
-
-        <div className="relative flex flex-col items-center shadow-[0_5px_20px_rgba(0,0,0,0.8)]">
-           {/* Head */}
-           <div className="w-8 h-9 bg-gradient-to-b from-stone-200 to-stone-400 rounded-lg relative flex justify-center z-10 border border-stone-400">
-              {/* Hair */}
-              <div className="absolute -top-1 inset-x-0 h-3 bg-gradient-to-b from-stone-800 to-stone-900 rounded-t-lg" />
-              
-              {/* Sunglasses */}
-              <div className="absolute top-3 inset-x-1.5 h-2 bg-gradient-to-b from-black to-zinc-900 flex justify-between px-0.5 shadow-sm overflow-hidden">
-                <div className="w-1.5 h-full bg-emerald-500/20 absolute left-1 top-0 rotate-45 transform origin-top-left" />
-              </div>
-              
-              {/* Earpiece */}
-              <div className="absolute top-4 -right-1 w-1.5 h-2 bg-stone-300 rounded-l-sm flex items-center justify-center border-l-2 border-stone-400 z-0">
-                <div className="w-2 h-4 absolute top-2 right-0 border-r border-[#00ff00] rounded-br-[40%] opacity-60" />
-              </div>
-              
-              {/* Mouth (Stern) */}
-              <div className="absolute bottom-2 w-3 h-[1px] bg-stone-600" />
-           </div>
-
-           {/* Torso - Black Suit */}
-           <div className="w-12 h-10 bg-gradient-to-b from-zinc-900 to-black rounded-t-xl -mt-1 relative flex justify-center shadow-inner overflow-hidden border border-zinc-800 border-b-0">
-              {/* White Shirt + Tie */}
-              <div className="w-3 h-full bg-slate-100 flex justify-center pb-2">
-                 {/* Green Tie */}
-                 <div className="w-1 h-3/4 bg-emerald-800 mt-1" />
-              </div>
-              {/* Suit Lapels */}
-              <div className="absolute top-0 left-0 w-4 h-full bg-gradient-to-br from-zinc-800 to-black transform origin-top-left skew-x-[15deg] shadow-[2px_0_5px_rgba(0,0,0,0.5)]" />
-              <div className="absolute top-0 right-0 w-4 h-full bg-gradient-to-bl from-zinc-800 to-black transform origin-top-right skew-x-[-15deg] shadow-[-2px_0_5px_rgba(0,0,0,0.5)]" />
-              
-              <div className="absolute top-4 inset-x-0 bottom-0 opacity-20 pointer-events-none flex justify-center scale-75">
-                 {getBrandIcon()}
-              </div>
-           </div>
-
-           {/* Legs */}
-           <div className="flex gap-1 -mt-1 z-0">
-              <motion.div
-                 className="w-3.5 h-5 bg-gradient-to-b from-black to-zinc-900 origin-top shadow-sm border-l border-zinc-800"
-                 animate={isMoving ? { rotate: [20, -20] } : {}}
-                 transition={{
-                    repeat: Infinity,
-                    duration: 0.3,
-                    repeatType: "mirror",
-                 }}
-              />
-              <motion.div
-                 className="w-3.5 h-5 bg-gradient-to-b from-black to-zinc-900 origin-top shadow-sm border-r border-zinc-800"
-                 animate={isMoving ? { rotate: [-20, 20] } : {}}
-                 transition={{
-                    repeat: Infinity,
-                    duration: 0.3,
-                    repeatType: "mirror",
-                    delay: 0.15,
-                 }}
-              />
-           </div>
-        </div>
-      </div>
     );
   }
 
@@ -547,6 +413,90 @@ export const Competitor = ({
         />
         <div className="text-[6px] font-mono text-fuchsia-300 font-bold mt-1">
           ERR
+        </div>
+      </div>
+    );
+  }
+
+  if (variant === "target") {
+    return (
+      <div className="relative w-16 h-20 flex flex-col items-center justify-end scale-90 landscape:scale-100">
+        <motion.div
+          className="absolute -top-6 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none z-50"
+          animate={{ y: [0, -4, 0] }}
+          transition={{ repeat: Infinity, duration: 2 }}
+        >
+          <div className="bg-white/95 text-black text-[8px] px-2 py-0.5 rounded-full font-black border-2 border-red-600 uppercase shadow-lg flex items-center gap-1.5 min-w-[60px] justify-center">
+            <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
+            {getName()}
+          </div>
+        </motion.div>
+
+        <div className="relative flex flex-col items-center">
+          {/* Robot Head */}
+          <div
+            className={cn(
+              "w-9 h-9 rounded-full border-2 border-slate-900 flex items-center justify-center shadow-xl bg-gradient-to-br",
+              getColors(),
+            )}
+          >
+            <div className="scale-90 text-white drop-shadow-sm">
+              {getIcon()}
+            </div>
+          </div>
+
+          {/* The Target Board - High visibility and "AI Caras" */}
+          <motion.div
+            className="absolute -top-14 w-16 h-16 rounded-full border-[6px] border-red-600 bg-white flex items-center justify-center shadow-2xl z-30 ring-4 ring-white/30"
+            animate={{
+              rotate: isMoving ? [-8, 8] : 0,
+              scale: [1, 1.05, 1],
+            }}
+            transition={{
+              repeat: Infinity,
+              duration: 0.8,
+              repeatType: "mirror",
+            }}
+          >
+            {/* Bullseye Rings */}
+            <div className="absolute inset-0 border-[4px] border-red-600/10 rounded-full" />
+            <div className="w-10 h-10 rounded-full border-[4px] border-red-600 flex items-center justify-center">
+              <div className="w-6 h-6 rounded-full bg-red-600 flex items-center justify-center shadow-inner">
+                <div className="scale-125 text-white invert saturate-200 drop-shadow-md">
+                  {getIcon()}
+                </div>
+              </div>
+            </div>
+            {/* Decorative crosshair */}
+            <div className="absolute inset-0 border border-red-600/5 pointer-events-none" />
+          </motion.div>
+
+          {/* Arms - Simple robot arms */}
+          <div className="absolute top-4 -left-3 w-4 h-1.5 bg-slate-800 rounded-full rotate-45 shadow-sm" />
+          <div className="absolute top-4 -right-3 w-4 h-1.5 bg-slate-800 rounded-full -rotate-45 shadow-sm" />
+
+          {/* Leg Movement */}
+          <div className="flex gap-1.5 -mt-1.5">
+            <motion.div
+              className="w-2.5 h-5 bg-slate-950 rounded-b-md origin-top shadow-sm"
+              animate={isMoving ? { rotate: [45, -45] } : {}}
+              transition={{
+                repeat: Infinity,
+                duration: 0.25,
+                repeatType: "mirror",
+              }}
+            />
+            <motion.div
+              className="w-2.5 h-5 bg-slate-950 rounded-b-md origin-top shadow-sm"
+              animate={isMoving ? { rotate: [-45, 45] } : {}}
+              transition={{
+                repeat: Infinity,
+                duration: 0.25,
+                repeatType: "mirror",
+                delay: 0.125,
+              }}
+            />
+          </div>
         </div>
       </div>
     );
@@ -983,8 +933,8 @@ export const Competitor = ({
   if (variant === "fish") {
     return (
       <div className="relative w-12 h-10 flex flex-col items-center">
-        <motion.div className="absolute -top-8 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none z-50">
-          <div className="bg-cyan-600 text-white text-[7px] px-1.5 py-0.5 rounded-sm font-black italic border border-white/20 uppercase whitespace-nowrap">
+        <motion.div className="absolute -top-8 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none">
+          <div className="bg-cyan-600 text-white text-[7px] px-1.5 py-0.5 rounded-sm font-black italic border border-white/20 uppercase">
             {getName()}
           </div>
         </motion.div>
@@ -1003,86 +953,6 @@ export const Competitor = ({
           <div className="absolute -top-3 left-4 w-4 h-4 bg-cyan-600 border-2 border-cyan-800 rounded-t-full" />
           <div className="absolute -bottom-2 left-4 w-3 h-3 bg-cyan-600 border-2 border-cyan-800 rounded-b-full" />
         </motion.div>
-      </div>
-    );
-  }
-
-  if (variant === "octopus") {
-    return (
-      <div className="relative w-14 h-16 flex flex-col items-center">
-        <motion.div className="absolute -top-8 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none z-50">
-          <div className="bg-purple-600 text-white text-[7px] px-1.5 py-0.5 rounded-sm font-black italic border border-white/20 uppercase whitespace-nowrap">
-            OCTO {getName()}
-          </div>
-        </motion.div>
-        <motion.div
-          className="relative w-12 h-10 bg-purple-500 rounded-t-full rounded-b-xl border-2 border-purple-800 flex flex-col items-center justify-start pt-2 z-10"
-          animate={isMoving ? { y: [-3, 3, -3], scaleY: [0.9, 1.1, 0.9] } : {}}
-          transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
-        >
-          {/* Eyes */}
-          <div className="flex gap-2 mb-1">
-             <div className="w-2.5 h-2.5 bg-white border border-purple-900 rounded-full flex items-center justify-center">
-                <div className="w-1 h-1 bg-black rounded-full pointer-events-none" />
-             </div>
-             <div className="w-2.5 h-2.5 bg-white border border-purple-900 rounded-full flex items-center justify-center">
-                <div className="w-1 h-1 bg-black rounded-full pointer-events-none" />
-             </div>
-          </div>
-          <div className="w-4 h-4 bg-white/20 rounded-full flex items-center justify-center overflow-hidden border border-purple-400">
-             <div className="scale-50">{getIcon()}</div>
-          </div>
-        </motion.div>
-
-        {/* Tentacles */}
-        <div className="flex gap-0.5 absolute bottom-0 left-1 right-1 justify-center z-0">
-          {[...Array(6)].map((_, i) => (
-             <motion.div 
-                key={i}
-                className="w-1.5 h-5 bg-purple-600 border-x border-b border-purple-800 rounded-b-full origin-top"
-                animate={isMoving ? { rotate: i % 2 === 0 ? [-20, 20, -20] : [20, -20, 20], scaleY: [0.8, 1.2, 0.8] } : {}}
-                transition={{ repeat: Infinity, duration: 2, delay: i * 0.1, ease: "easeInOut" }}
-             />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (variant === "jellyfish") {
-    return (
-      <div className="relative w-12 h-16 flex flex-col items-center">
-        <motion.div className="absolute -top-8 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none z-50">
-          <div className="bg-pink-500 text-white text-[7px] px-1.5 py-0.5 rounded-sm font-black italic border border-white/20 uppercase whitespace-nowrap">
-            JELLY {getName()}
-          </div>
-        </motion.div>
-        <motion.div
-           className="relative w-12 h-8 bg-pink-400/80 backdrop-blur-sm rounded-t-full border-2 border-pink-300 flex items-center justify-center z-10 shadow-[0_0_15px_rgba(236,72,153,0.5)]"
-           animate={isMoving ? { y: [-4, 4, -4], scaleX: [0.9, 1.1, 0.9], scaleY: [1.1, 0.9, 1.1] } : {}}
-           transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-        >
-          <div className="absolute inset-1 border-t-2 border-white/40 rounded-t-full pointer-events-none" />
-          {/* Eyes */}
-          <div className="flex gap-3 relative z-10 mt-2">
-             <div className="w-1.5 h-1.5 bg-black rounded-full" />
-             <div className="w-1.5 h-1.5 bg-black rounded-full" />
-          </div>
-          <div className="absolute top-1 right-2 w-2 h-2 bg-white/60 rounded-full" />
-          {getIcon()}
-        </motion.div>
-        
-        {/* Tentacles */}
-        <div className="flex w-full justify-evenly absolute top-7 px-1 z-0">
-           {[...Array(5)].map((_, i) => (
-             <motion.div 
-               key={i}
-               className="w-1 h-8 bg-pink-300/80 rounded-full shadow-[0_0_5px_rgba(236,72,153,0.5)] origin-top"
-               animate={isMoving ? { rotate: [-10, 10, -10], y: [0, -3, 0] } : {}}
-               transition={{ repeat: Infinity, duration: 1.5, delay: i * 0.2, ease: "easeInOut" }}
-             />
-           ))}
-        </div>
       </div>
     );
   }

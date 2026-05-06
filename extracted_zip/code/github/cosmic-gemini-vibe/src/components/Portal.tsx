@@ -7,7 +7,7 @@ interface PortalProps {
 
 export const Portal = ({ number, color }: PortalProps) => {
   return (
-    <div className="relative w-40 h-64 md:w-80 md:h-80 flex items-center justify-center">
+    <div className="relative w-64 h-96 flex items-center justify-center">
       {/* Outer Glow Ring */}
       <motion.div
         className="absolute inset-0 rounded-full blur-3xl opacity-40"
@@ -26,12 +26,12 @@ export const Portal = ({ number, color }: PortalProps) => {
 
       {/* The Luminous Number */}
       <motion.div
-        className="relative z-10 text-[3rem] md:text-[6rem] font-black leading-none italic select-none"
+        className="relative z-10 text-[20rem] font-black leading-none italic select-none"
         style={{ 
           color: 'white',
-          textShadow: `0 0 10px ${color}, 0 0 20px ${color}`
+          textShadow: `0 0 30px ${color}, 0 0 60px ${color}`
         }}
-        animate={{ scale: [0.95, 1.05, 0.95], y: [0, -5, 0] }}
+        animate={{ scale: [0.95, 1.05, 0.95], y: [0, -10, 0] }}
         transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
       >
         {number}

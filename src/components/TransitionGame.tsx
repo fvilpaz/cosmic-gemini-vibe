@@ -1,8 +1,8 @@
 import { motion, AnimatePresence } from 'motion/react';
 import { useState, useEffect } from 'react';
-import { Brain, Sparkles, Cpu, Target } from 'lucide-react';
+import { Rocket, Brain, Sparkles, Cpu, Target } from 'lucide-react';
 
-export const TransitionGame = () => {
+export const TransitionGame = ({ variant = "orb" }: { variant?: "orb" | "ship" }) => {
   const [shots, setShots] = useState<{ id: number; x: number; y: number }[]>([]);
   const [meteors, setMeteors] = useState<{ id: number; x: number; y: number; type: 'gpt' | 'claude' | 'copilot'; destroyed: boolean }[]>([]);
   const [score, setScore] = useState(0);
@@ -63,41 +63,82 @@ export const TransitionGame = () => {
         />
       ))}
 
-      {/* Ship */}
-      <motion.div 
-        className="absolute bottom-10 left-1/2 -translate-x-1/2 z-50"
-        animate={{ x: '-50%', translateX: ['-60px', '60px', '-60px'] }}
-        transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
-      >
-        <div className="relative w-16 h-20 flex flex-col items-center">
-          {/* Main Body */}
-          <div className="w-10 h-16 bg-white rounded-t-full border-2 border-slate-300 relative overflow-hidden shadow-[0_0_20px_rgba(255,255,255,0.3)]">
-             {/* Google G Colors */}
-             <div className="absolute top-0 left-0 w-full h-1/4 bg-blue-500" />
-             <div className="absolute top-1/4 left-0 w-full h-1/4 bg-red-500" />
-             <div className="absolute top-2/4 left-0 w-full h-1/4 bg-yellow-500" />
-             <div className="absolute top-3/4 left-0 w-full h-1/4 bg-green-500" />
-             <div className="absolute inset-2 bg-white rounded-t-full flex items-center justify-center font-black text-slate-800 text-lg">G</div>
+      {/* Player Character */}
+      {variant === "ship" ? (
+        <motion.div 
+          className="absolute bottom-10 left-1/2 -translate-x-1/2 z-50"
+          animate={{ x: '-50%', translateX: ['-60px', '60px', '-60px'] }}
+          transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
+        >
+          <div className="relative w-16 h-20 flex flex-col items-center">
+            {/* Main Body */}
+            <div className="w-10 h-16 bg-white rounded-t-full border-2 border-slate-300 relative overflow-hidden shadow-[0_0_20px_rgba(255,255,255,0.3)]">
+               {/* Google G Colors */}
+               <div className="absolute top-0 left-0 w-full h-1/4 bg-blue-500" />
+               <div className="absolute top-1/4 left-0 w-full h-1/4 bg-red-500" />
+               <div className="absolute top-2/4 left-0 w-full h-1/4 bg-yellow-500" />
+               <div className="absolute top-3/4 left-0 w-full h-1/4 bg-green-500" />
+               <div className="absolute inset-2 bg-white rounded-t-full flex items-center justify-center font-black text-slate-800 text-lg">G</div>
+            </div>
+            {/* Wings */}
+            <div className="absolute bottom-4 -left-4 w-6 h-8 bg-slate-200 border-2 border-slate-300 rounded-l-full rotate-[-20deg]" />
+            <div className="absolute bottom-4 -right-4 w-6 h-8 bg-slate-200 border-2 border-slate-300 rounded-r-full rotate-[20deg]" />
+            
+            {/* Thrusters */}
+            <div className="flex justify-between w-full absolute -bottom-4 px-2">
+               <motion.div 
+                  className="w-3 h-8 bg-blue-400 rounded-full blur-[1px]"
+                  animate={{ scaleY: [1, 2, 1], opacity: [0.6, 1, 0.6] }}
+                  transition={{ repeat: Infinity, duration: 0.1 }}
+               />
+               <motion.div 
+                  className="w-3 h-8 bg-blue-400 rounded-full blur-[1px]"
+                  animate={{ scaleY: [1, 2, 1], opacity: [0.6, 1, 0.6] }}
+                  transition={{ repeat: Infinity, duration: 0.1, delay: 0.05 }}
+               />
+            </div>
           </div>
-          {/* Wings */}
-          <div className="absolute bottom-4 -left-4 w-6 h-8 bg-slate-200 border-2 border-slate-300 rounded-l-full rotate-[-20deg]" />
-          <div className="absolute bottom-4 -right-4 w-6 h-8 bg-slate-200 border-2 border-slate-300 rounded-r-full rotate-[20deg]" />
-          
-          {/* Thrusters */}
-          <div className="flex justify-between w-full absolute -bottom-4 px-2">
-             <motion.div 
-                className="w-3 h-8 bg-blue-400 rounded-full blur-[1px]"
-                animate={{ scaleY: [1, 2, 1], opacity: [0.6, 1, 0.6] }}
-                transition={{ repeat: Infinity, duration: 0.1 }}
-             />
-             <motion.div 
-                className="w-3 h-8 bg-blue-400 rounded-full blur-[1px]"
-                animate={{ scaleY: [1, 2, 1], opacity: [0.6, 1, 0.6] }}
-                transition={{ repeat: Infinity, duration: 0.1, delay: 0.05 }}
-             />
+        </motion.div>
+      ) : (
+        <motion.div 
+          className="absolute bottom-10 left-1/2 -translate-x-1/2 z-50"
+          animate={{ x: '-50%', translateX: ['-60px', '60px', '-60px'] }}
+          transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
+        >
+          <div className="relative w-20 h-20 flex flex-col items-center justify-center">
+            {/* Outer glow */}
+            <motion.div 
+              className="absolute inset-0 rounded-full bg-blue-400/40 blur-xl"
+              animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0.9, 0.5] }}
+              transition={{ repeat: Infinity, duration: 1.5 }}
+            />
+            {/* Inner ring */}
+            <motion.div 
+              className="absolute inset-2 rounded-full border-4 border-dashed border-white/50"
+              animate={{ rotate: 360 }}
+              transition={{ repeat: Infinity, duration: 4, ease: "linear" }}
+            />
+            {/* Core sphere */}
+            <div className="relative w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(255,255,255,1)] overflow-hidden">
+               {/* Google Colors in the core */}
+               <div className="absolute top-0 left-0 w-full h-1/4 bg-[#4285F4]" />
+               <div className="absolute top-1/4 left-0 w-full h-1/4 bg-[#EA4335]" />
+               <div className="absolute top-2/4 left-0 w-full h-1/4 bg-[#FBBC05]" />
+               <div className="absolute top-3/4 left-0 w-full h-1/4 bg-[#34A853]" />
+               <div className="absolute inset-1 bg-white rounded-full flex items-center justify-center">
+                 <span className="text-2xl font-black text-slate-800 tracking-tighter">G</span>
+               </div>
+            </div>
+            
+            {/* Energy trail */}
+            <motion.div 
+               className="absolute top-full w-6 h-24 bg-gradient-to-t from-transparent via-cyan-300/60 to-white/90 blur-md rounded-full mt-[-10px]"
+               animate={{ height: ['96px', '140px', '96px'], opacity: [0.5, 1, 0.5] }}
+               transition={{ repeat: Infinity, duration: 0.5 }}
+            />
           </div>
-        </div>
-      </motion.div>
+        </motion.div>
+      )}
 
       {/* Shots */}
       {shots.map((s, i) => {

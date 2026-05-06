@@ -11,7 +11,7 @@ interface DollarProps {
 export const Dollar = ({ x, isLandscape }: DollarProps) => {
   return (
     <motion.div 
-      className="absolute bottom-[130px] w-12 h-12 flex items-center justify-center z-[25]"
+      className="absolute bottom-[140px] landscape:bottom-[60px] w-12 h-12 flex items-center justify-center z-[25]"
       style={{ 
         left: `${x}px`,
         transform: isLandscape ? 'scale(1.1)' : 'none'

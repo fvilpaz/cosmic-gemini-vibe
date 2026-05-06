@@ -15,12 +15,14 @@ import { LEVELS } from "./types";
 import { LevelBackground } from "./components/LevelBackground";
 import { GeminiRunner } from "./components/GeminiRunner";
 import { Competitor, CompetitorType } from "./components/Competitor";
-import { LevelPortal } from "./components/LevelPortal";
+import { Portal } from "./components/Portal";
 import { Dollar } from "./components/Dollar";
 import { Flyer } from "./components/Flyer";
 import { TokenProjectile } from "./components/Projectile";
 import { TransitionGame } from "./components/TransitionGame";
 import { cn } from "./lib/utils";
+
+import { RotateScreen } from "./components/RotateScreen";
 
 const GRAVITY = 0.4;
 const JUMP_FORCE = -11;
@@ -41,17 +43,9 @@ export default function App() {
 
   useEffect(() => {
     const handleResize = () => {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      const isL = w > h;
-      // Global mobile landscape scale factor
-      const scaleBase = (isL && h < 500) ? Math.max(0.45, h / 750) : 1;
-      
-      winWRef.current = w / scaleBase;
-      winHRef.current = h / scaleBase;
-      setIsLandscape(isL);
-      document.documentElement.style.setProperty('--mobile-scale', scaleBase.toString());
-      document.documentElement.style.setProperty('--mobile-inv-scale', (1 / scaleBase).toString());
+      winWRef.current = window.innerWidth;
+      winHRef.current = window.innerHeight;
+      setIsLandscape(window.innerWidth > window.innerHeight);
     };
     handleResize();
     window.addEventListener("resize", handleResize);
@@ -69,7 +63,6 @@ export default function App() {
   const [flyTimer, setFlyTimer] = useState(0);
   const [isTransforming, setIsTransforming] = useState(false);
   const isTransformingRef = useRef(false);
-  const hasTransformedThisLevelRef = useRef(false);
   const deathSequenceRef = useRef(false);
   const [showDeathScreen, setShowDeathScreen] = useState(false);
   const screenshakeRef = useRef(0);
@@ -225,7 +218,6 @@ export default function App() {
     setIsJumping(false);
     isJumpingRef.current = false;
     isTransformingRef.current = false;
-    hasTransformedThisLevelRef.current = level.number === 5; // Do not transform in level 5
     setIsTransforming(false);
     setIsAbducting(false);
     isAbductingRef.current = false;
@@ -264,42 +256,11 @@ export default function App() {
   const gameLoop = useCallback((time: number) => {
     if (!lastTimeRef.current) lastTimeRef.current = time;
     let dt = time - lastTimeRef.current;
-    if (dt > 100) dt = 100; // Cap at 100ms so we don't go into slow-motion, but physics don't break too badly
+    if (dt > 100) dt = 16.666;
     lastTimeRef.current = time;
     const timeScale = dt / 16.666;
 
     if (gameStateRef.current !== "playing" || !currentLevelRef.current) {
-      if (gameStateRef.current === "interlevel" && currentLevelRef.current) {
-        const isL = winWRef.current > winHRef.current;
-        const groundY = 100;
-        const camX = Math.max(0, playerXRef.current - (isL ? 1200 : winWRef.current) / 3);
-        const worldEl = document.getElementById("game-world");
-        if (worldEl) worldEl.style.transform = `translateX(${-camX}px)`;
-        const playerEl = document.getElementById("player-wrapper");
-        if (playerEl) {
-          playerEl.style.left = `${playerXRef.current}px`;
-          playerEl.style.bottom = `${groundY - playerYRef.current}px`;
-        }
-        
-        const worldLevelFactor = currentLevelRef.current?.number === 1 ? 0.65 : 1.0;
-        const eScaleMultiplier = (isL ? 0.85 : 0.95) * worldLevelFactor;
-        enemiesRef.current.forEach((e: any) => {
-          const el = document.getElementById("enemy-" + e.id);
-          if (el) {
-            el.style.left = `${e.x}px`;
-            el.style.bottom = `${groundY - e.y}px`;
-            el.style.transform = `scale(${(e.size || 1) * eScaleMultiplier}) ${e.behavior === "roll" ? `rotate(${e.phase}deg)` : ""}`;
-          }
-        });
-        
-        const ridingAnimalEl = document.getElementById("riding-animal");
-        if (ridingAnimalEl) {
-          ridingAnimalEl.style.left = `${playerXRef.current - 10}px`;
-          ridingAnimalEl.style.bottom = `${groundY - playerYRef.current - 10}px`;
-        }
-        
-        window.dispatchEvent(new CustomEvent("updateCamera", { detail: camX }));
-      }
       requestRef.current = requestAnimationFrame(gameLoop);
       return;
     }
@@ -322,7 +283,7 @@ export default function App() {
     const isL = winWRef.current > winHRef.current;
     const gScale = isL ? Math.max(1, winWRef.current / 1200) : 1;
     const internalH = isL ? winHRef.current / gScale : winHRef.current;
-    const baseSpeed = 3.0; // Universal base speed so time-to-complete is identical on mobile & desktop
+    const baseSpeed = (isL ? 3.2 : 1.7) / gScale;
     let nX = playerXRef.current + baseSpeed * timeScale;
     let nY = playerYRef.current;
     let nVY = velocityYRef.current;
@@ -443,7 +404,7 @@ export default function App() {
       let newPhase = e.phase || 0;
 
       // Behavior Logic
-      if (e.variant === "farmer" && currentLevelRef.current?.number !== 1) {
+      if (e.variant === "farmer") {
         if (Math.abs(nX - e.x) < 950) {
           newPhase += 1 * timeScale;
         }
@@ -457,8 +418,6 @@ export default function App() {
       } else if (e.behavior === "roll") {
         speedMult = 1.9;
         newPhase += 15 * timeScale;
-      } else if (e.behavior === "idle") {
-        speedMult = 0;
       } else if (e.behavior === "sprint") {
         speedMult = Math.sin(Date.now() / 400) > 0 ? 3 : 0.5;
       } else if (e.behavior === "back") {
@@ -476,11 +435,7 @@ export default function App() {
         newPhase += 1 * timeScale;
       }
       // World 6: track phase for per-alien timed laser shots
-      // World 4: track phase for fish/octopus/jellyfish enemies to shoot
-      if (
-        (currentLevelRef.current?.number === 6 && e.variant === "alien") ||
-        (currentLevelRef.current?.number === 4 && (e.variant === "normal" || e.variant === "fish" || e.variant === "octopus" || e.variant === "jellyfish"))
-      ) {
+      if (currentLevelRef.current?.number === 6 && e.variant === "alien") {
         newPhase += 1 * timeScale;
       }
 
@@ -522,9 +477,8 @@ export default function App() {
         // Slowly track Gemini Y
         if (Math.abs(nX - e.x) < 800) {
           // Only start tracking when relatively close
-          const targetY = e.variant === "helicopter" ? nY - 200 : nY;
-          if (newEy > targetY + 10) newEy -= 1.5 * timeScale;
-          else if (newEy < targetY - 10) newEy += 1.5 * timeScale;
+          if (newEy > nY + 10) newEy -= 1.5 * timeScale;
+          else if (newEy < nY - 10) newEy += 1.5 * timeScale;
         }
       }
 
@@ -575,8 +529,7 @@ export default function App() {
         !deathSequenceRef.current &&
         !isHitRef.current &&
         e.variant !== "farmer" &&
-        e.variant !== "professor" &&
-        currentLevelRef.current?.number !== 1 // Celebration Level: No Hits!
+        e.variant !== "professor"
       ) {
         // Fix stomp: Check if the player was above the enemy in the previous frame
         const wasAboveIt = nY - nVY < eTop + 24;
@@ -643,16 +596,12 @@ export default function App() {
       });
     }
 
-    // World 6/4: each soldier fires every ~180 frames (phase-based, ~3s)
-    if (currentLevelRef.current?.number === 6 || currentLevelRef.current?.number === 4) {
+    // World 6: each alien soldier fires every ~180 frames (phase-based, ~3s)
+    if (currentLevelRef.current?.number === 6) {
       enemiesRef.current.forEach((e: any) => {
-        const isShooter = 
-          (currentLevelRef.current?.number === 6 && e.variant === "alien") ||
-          (currentLevelRef.current?.number === 4 && (e.variant === "normal" || e.variant === "fish" || e.variant === "octopus" || e.variant === "jellyfish"));
-
         if (
           !e.isDead &&
-          isShooter &&
+          e.variant === "alien" &&
           e.phase >= 180 &&
           Math.abs(nX - e.x) > 80 &&
           Math.abs(nX - e.x) < 700
@@ -677,7 +626,7 @@ export default function App() {
     // Global Farmer Logic
     const _prevFarmerPhase = farmerPhaseRef.current;
     if (
-      currentLevelRef.current?.enemySpawns?.some((s) => s.variant === "farmer") && currentLevelRef.current?.number !== 1
+      currentLevelRef.current?.enemySpawns?.some((s) => s.variant === "farmer")
     ) {
       farmerTimerRef.current += timeScale;
       const ft = farmerTimerRef.current;
@@ -731,7 +680,7 @@ export default function App() {
     if (
       currentLevelRef.current?.enemySpawns?.some(
         (s) => s.variant === "professor",
-      ) && currentLevelRef.current?.number !== 1
+      )
     ) {
       profTimerRef.current += timeScale;
       const pt = profTimerRef.current;
@@ -774,10 +723,9 @@ export default function App() {
       setProfPhase(profPhaseRef.current);
 
     // Direct DOM update for enemies
-    const groundY = 100;
+    const groundY = isL ? 70 : 120;
     const isW2 = currentLevelRef.current?.number === 7;
-    const worldLevelFactor = currentLevelRef.current?.number === 1 ? 0.65 : 1.0;
-    const eScaleMultiplier = (isL ? 0.85 : 0.95) * worldLevelFactor;
+    const eScaleMultiplier = isL ? 0.85 : 0.95;
     enemiesRef.current.forEach((e: any) => {
       const el = document.getElementById("enemy-" + e.id);
       if (el) {
@@ -865,26 +813,17 @@ export default function App() {
         // Must jump to collect (nY must be sufficiently high)
         if (!f.isCollected && Math.abs(nX - f.x) < 80 && nY < -80) {
           changed = true;
-          if (!hasTransformedThisLevelRef.current) {
-            hasTransformedThisLevelRef.current = true;
-            setIsTransforming(true);
-            isTransformingRef.current = true;
-            screenshakeRef.current = 20;
-            setTimeout(() => {
-              setIsFlying(true);
-              isFlyingRef.current = true;
-              flyTimerRef.current = 360;
-              setFlyTimer(360);
-              setIsTransforming(false);
-              isTransformingRef.current = false;
-            }, 2000);
-          } else {
-            // Already transformed, just give flight time
+          setIsTransforming(true);
+          isTransformingRef.current = true;
+          screenshakeRef.current = 20;
+          setTimeout(() => {
             setIsFlying(true);
             isFlyingRef.current = true;
-            flyTimerRef.current = Math.max(flyTimerRef.current, 360);
-            setFlyTimer(Math.max(flyTimerRef.current, 360));
-          }
+            flyTimerRef.current = 360;
+            setFlyTimer(360);
+            setIsTransforming(false);
+            isTransformingRef.current = false;
+          }, 2000);
           return { ...f, isCollected: true };
         }
         return f;
@@ -903,7 +842,7 @@ export default function App() {
     let eChanged = false;
 
     const uEnemies = enemiesRef.current.map((e) => {
-      if (e.isDead || currentLevelRef.current?.number === 1) return e;
+      if (e.isDead) return e;
       const bHit = movedProjectiles.find(
         (p) =>
           !deadIds.has(p.id) &&
@@ -937,7 +876,7 @@ export default function App() {
     }
     projectilesRef.current = uncollided;
 
-    if (nX >= currentLevelRef.current.worldLength - 120) {
+    if (nX >= currentLevelRef.current.worldLength) {
       if (currentLevelRef.current.number === 7 && !isAbductingRef.current) {
         setIsAbducting(true);
         isAbductingRef.current = true;
@@ -1052,8 +991,8 @@ export default function App() {
       return;
     }
 
-    if (currentIdx === 3 || currentIdx === 4 || currentIdx === 5 || currentIdx === 6 || currentIdx === 7) {
-      // El Oeste / Nave Alien / Galaxia / Océano Cyber / Cementerio Caótico
+    if (currentIdx === 3 || currentIdx === 4 || currentIdx === 5) {
+      // El Oeste / Nave Alien / Galaxia
       shootRef.current();
     } else {
       triggerJump();
@@ -1066,8 +1005,7 @@ export default function App() {
     const isShooterLevel =
       currentLevelRef.current?.number === 7 ||
       currentLevelRef.current?.number === 6 ||
-      currentLevelRef.current?.number === 5 ||
-      currentLevelRef.current?.number === 4;
+      currentLevelRef.current?.number === 5;
     if (!isShooterLevel && powerLevelRef.current === 0) return;
 
     if (isShootingRef.current) return; // Debounce
@@ -1203,16 +1141,6 @@ export default function App() {
         transform: `translate(${shakeX}px, ${shakeY}px)`,
       }}
     >
-      <div 
-        style={{
-          transform: `scale(var(--mobile-scale, 1))`,
-          transformOrigin: 'top left',
-          width: `calc(100% * var(--mobile-inv-scale, 1))`,
-          height: `calc(100% * var(--mobile-inv-scale, 1))`,
-          position: 'relative'
-        }}
-      >
-        
       {/* Game Rendering Area */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div
@@ -1232,25 +1160,112 @@ export default function App() {
                   className="absolute inset-0 will-change-transform"
                   style={{ transform: `translateX(${-cameraX}px)` }}
                 >
-                  {/* The Level Portal */}
-                  <div
-                    className="absolute flex flex-col items-center -translate-x-1/2 select-none"
-                    style={{
-                      bottom: `100px`,
-                      left: `${currentLevel.worldLength}px`,
-                    }}
-                  >
-                    <LevelPortal
-                      currentLevelNumber={currentLevel.number}
-                      targetNumber={
-                        gameState === "interlevel"
-                          ? currentLevel.number - 1
-                          : currentIdx < LEVELS.length - 1
+                  {/* The Number Portal */}
+                  {currentLevel.number !== 7 && currentLevel.number !== 6 && (
+                    <div
+                      className="absolute flex flex-col items-center"
+                      style={{
+                        bottom: `${isLandscape ? 70 : 120}px`,
+                        left: `${currentLevel.worldLength}px`,
+                      }}
+                    >
+                      <Portal
+                        number={
+                          currentIdx < LEVELS.length - 1
                             ? LEVELS[currentIdx + 1].number
                             : 1
-                      }
-                    />
-                  </div>
+                        }
+                        color={currentLevel.particleColor}
+                      />
+                      <motion.div
+                        animate={{ scale: [1, 1.1, 1] }}
+                        transition={{ repeat: Infinity, duration: 1 }}
+                        className="mt-8 bg-white/10 backdrop-blur-md px-6 py-2 rounded-full border border-white/20"
+                      >
+                        <p className="text-2xl font-black italic tracking-widest text-white shadow-xl">
+                          {currentIdx < LEVELS.length - 1
+                            ? `PORTAL TO WORLD ${LEVELS[currentIdx + 1].number}`
+                            : "FINAL SYNC"}
+                        </p>
+                      </motion.div>
+                    </div>
+                  )}
+
+                  {/* World 6: Hangar exit door */}
+                  {currentLevel.number === 6 && (
+                    <div
+                      className="absolute flex flex-col items-center"
+                      style={{
+                        bottom: `${isLandscape ? 70 : 120}px`,
+                        left: `${currentLevel.worldLength}px`,
+                      }}
+                    >
+                      <div
+                        className="relative w-36 h-60 border-4 border-zinc-400 overflow-hidden shadow-[0_0_40px_rgba(74,222,128,0.6)]"
+                        style={{
+                          backgroundImage:
+                            "repeating-linear-gradient(45deg, rgba(251,191,36,0.25) 0px, rgba(251,191,36,0.25) 6px, transparent 6px, transparent 18px)",
+                          backgroundColor: "#18181b",
+                        }}
+                      >
+                        {/* Space through door */}
+                        <div
+                          className="absolute inset-3 rounded-sm overflow-hidden"
+                          style={{
+                            background:
+                              "radial-gradient(ellipse at 50% 50%, #1e1b4b, #000)",
+                          }}
+                        >
+                          {[...Array(20)].map((_, i) => (
+                            <div
+                              key={i}
+                              className="absolute w-0.5 h-0.5 bg-white rounded-full"
+                              style={{
+                                top: `${(i * 47) % 100}%`,
+                                left: `${(i * 63) % 100}%`,
+                                opacity: 0.8,
+                              }}
+                            />
+                          ))}
+                        </div>
+                        {/* Number 5 glowing */}
+                        <motion.div
+                          className="absolute inset-0 flex items-center justify-center z-10"
+                          animate={{ opacity: [0.6, 1, 0.6] }}
+                          transition={{ repeat: Infinity, duration: 1 }}
+                        >
+                          <span
+                            className="text-6xl font-black text-green-400"
+                            style={{
+                              textShadow: "0 0 30px #4ade80, 0 0 60px #4ade80",
+                            }}
+                          >
+                            5
+                          </span>
+                        </motion.div>
+                        {/* Warning stripe */}
+                        <div
+                          className="absolute bottom-0 inset-x-0 h-3 z-20"
+                          style={{
+                            backgroundImage:
+                              "repeating-linear-gradient(90deg, #fbbf24 0px, #fbbf24 10px, #18181b 10px, #18181b 20px)",
+                          }}
+                        />
+                      </div>
+                      <motion.div
+                        animate={{ scale: [1, 1.1, 1] }}
+                        transition={{ repeat: Infinity, duration: 1 }}
+                        className="mt-4 bg-green-900/40 backdrop-blur-md px-4 py-2 rounded-full border border-green-500/50"
+                      >
+                        <p
+                          className="text-lg font-black italic tracking-widest text-green-400"
+                          style={{ textShadow: "0 0 15px #4ade80" }}
+                        >
+                          HANGAR EXIT → WORLD 5
+                        </p>
+                      </motion.div>
+                    </div>
+                  )}
 
                   {/* Platforms */}
                   {currentLevel.platforms.map((plat, i) => {
@@ -1273,7 +1288,7 @@ export default function App() {
                         }`}
                         style={{
                           left: `${plat.x}px`,
-                          bottom: `${100 + plat.y}px`,
+                          bottom: `${(isLandscape ? 70 : 120) + plat.y}px`,
                           width: `${plat.width}px`,
                           height: "40px",
                         }}
@@ -1293,32 +1308,16 @@ export default function App() {
 
                         {isEnergyFence && (
                           <div className="relative w-full h-full flex flex-col justify-center">
-                            <div 
-                              className={cn(
-                                "absolute inset-x-0 top-1/2 -translate-y-1/2 h-1 bg-cyan-400 shadow-[0_0_15px_#22d3ee]",
-                                currentLevel.number === 1 && "bg-cyan-400/30 shadow-[0_0_15px_rgba(34,211,238,0.2)]"
-                              )} 
-                            />
+                            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1 bg-cyan-400 shadow-[0_0_15px_#22d3ee]" />
                             <div
-                              className={cn(
-                                "absolute inset-x-0 top-1/2 -translate-y-1/2 h-8 bg-cyan-500/20 shadow-[0_0_20px_#22d3ee_inset]",
-                                currentLevel.number === 1 && "bg-cyan-500/10 shadow-[0_0_20px_rgba(34,211,238,0.2)_inset]"
-                              )}
+                              className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-8 bg-cyan-500/20 shadow-[0_0_20px_#22d3ee_inset]"
                               style={{
                                 backgroundImage:
-                                  currentLevel.number === 1 
-                                    ? "repeating-linear-gradient(90deg, transparent, transparent 10px, rgba(34,211,238,0.1) 10px, rgba(34,211,238,0.1) 12px)"
-                                    : "repeating-linear-gradient(90deg, transparent, transparent 10px, rgba(34,211,238,0.3) 10px, rgba(34,211,238,0.3) 12px)",
+                                  "repeating-linear-gradient(90deg, transparent, transparent 10px, rgba(34,211,238,0.3) 10px, rgba(34,211,238,0.3) 12px)",
                               }}
                             />
-                            <div className={cn(
-                              "absolute left-0 top-0 bottom-0 w-3 bg-zinc-800 rounded-full border border-cyan-400 z-10 shadow-[0_0_10px_#22d3ee]",
-                              currentLevel.number === 1 && "bg-zinc-800/40 border-cyan-400/20 shadow-none"
-                            )} />
-                            <div className={cn(
-                              "absolute right-0 top-0 bottom-0 w-3 bg-zinc-800 rounded-full border border-cyan-400 z-10 shadow-[0_0_10px_#22d3ee]",
-                              currentLevel.number === 1 && "bg-zinc-800/40 border-cyan-400/20 shadow-none"
-                            )} />
+                            <div className="absolute left-0 top-0 bottom-0 w-3 bg-zinc-800 rounded-full border border-cyan-400 z-10 shadow-[0_0_10px_#22d3ee]" />
+                            <div className="absolute right-0 top-0 bottom-0 w-3 bg-zinc-800 rounded-full border border-cyan-400 z-10 shadow-[0_0_10px_#22d3ee]" />
                           </div>
                         )}
 
@@ -1361,7 +1360,7 @@ export default function App() {
                       id={p.id}
                       key={p.id}
                       x={p.x}
-                      y={120 - p.y}
+                      y={(isLandscape ? 70 : 120) - p.y}
                       tier={p.tier}
                       variant={currentIdx === 3 ? "google" : "normal"}
                     />
@@ -1371,15 +1370,14 @@ export default function App() {
                   {isShooting &&
                     (currentIdx === 3 ||
                       currentIdx === 4 ||
-                      currentIdx === 5 ||
-                      currentIdx === 7) && (
+                      currentIdx === 5) && (
                       <motion.div
                         initial={{ opacity: 1, scale: 0.5 }}
                         animate={{ opacity: 0, scale: 1.5 }}
                         className="absolute z-50 w-8 h-8 bg-yellow-400 rounded-full blur-md"
                         style={{
                           left: `${playerXRef.current + 70}px`,
-                          bottom: `${100 - playerYRef.current + 30}px`,
+                          bottom: `${(isLandscape ? 70 : 120) - playerYRef.current + 30}px`,
                         }}
                       />
                     )}
@@ -1388,34 +1386,22 @@ export default function App() {
                   {enemiesRef.current.map(
                     (enemy) =>
                       !enemy.isDead &&
-                      (enemy.variant !== "farmer" || currentIdx === 9 || currentIdx === 2) &&
-                      (enemy.variant !== "professor" || currentIdx === 9 || currentIdx === 0) && (
+                      enemy.variant !== "farmer" &&
+                      enemy.variant !== "professor" && (
                         <div
                           id={`enemy-${enemy.id}`}
                           key={enemy.id}
-                          className="absolute z-60 will-change-transform"
+                          className="absolute z-20 will-change-transform"
                           style={{
                             left: `${enemy.x}px`,
-                            bottom: `${100 - enemy.y}px`,
-                            transform: `scale(${(enemy.size || 1) * (currentIdx === 9 ? 0.65 : 0.95)}) ${enemy.behavior === "roll" ? `rotate(${enemy.phase}deg)` : ""}`,
+                            bottom: `${(isLandscape ? 70 : 120) - enemy.y}px`,
+                            transform: `scale(${(enemy.size || 1) * (isLandscape ? 0.85 : 0.95)}) ${enemy.behavior === "roll" ? `rotate(${enemy.phase}deg)` : ""}`,
                             transformOrigin: "bottom",
                             filter: "drop-shadow(0 2px 10px rgba(0,0,0,0.9))",
                           }}
                         >
-                          {currentIdx === 9 && !enemy.isDead && (
-                            <motion.div 
-                              className="absolute -top-12 left-1/2 -translate-x-1/2 flex flex-col items-center select-none pointer-events-none drop-shadow-[0_0_10px_rgba(255,0,100,0.8)]"
-                              animate={{ 
-                                scale: [1, 1.3, 1],
-                                y: [0, -5, 0]
-                              }}
-                              transition={{ repeat: Infinity, duration: 1.5 }}
-                            >
-                              <div className="text-3xl text-pink-500">❤️</div>
-                            </motion.div>
-                          )}
-<Competitor
-  type={enemy.type}
+                          <Competitor
+                            type={enemy.type}
                             action={
                               enemy.variant === "farmer" &&
                               enemy.phase >= 120 &&
@@ -1429,9 +1415,11 @@ export default function App() {
                             variant={
                               enemy.variant
                                 ? enemy.variant
-                                : currentLevel.environment === "graveyard"
-                                  ? "zombie"
-                                  : currentLevel.environment === "moon"
+                                : currentLevel.number === 2
+                                  ? "target"
+                                  : currentLevel.environment === "graveyard"
+                                    ? "zombie"
+                                    : currentLevel.environment === "moon"
                                       ? "werewolf"
                                       : currentLevel.environment === "water"
                                         ? "fish"
@@ -1459,8 +1447,8 @@ export default function App() {
                       className="absolute z-20 pointer-events-none"
                       style={{
                         left: `${playerXRef.current - 20}px`,
-                        bottom: `${100 - playerYRef.current - 20}px`,
-                        transform: `scale(${isLandscape ? 1.15 : 1.49})`,
+                        bottom: `${(isLandscape ? 70 : 120) - playerYRef.current - 20}px`,
+                        transform: `scale(${isLandscape ? (window.innerHeight < 500 ? 0.7 : 1.3) : 1.7})`,
                       }}
                     >
                       <Competitor
@@ -1478,7 +1466,7 @@ export default function App() {
                       className="absolute z-20 flex items-end gap-2"
                       style={{
                         left: `${currentLevel.worldLength - 180}px`,
-                        bottom: `${100}px`,
+                        bottom: `${isLandscape ? 70 : 120}px`,
                       }}
                     >
                       {/* Post with crossbar */}
@@ -1511,10 +1499,10 @@ export default function App() {
                   {currentIdx === 5 && (
                     <motion.div
                       id="fighter-ship"
-                      className="absolute z-[25] pointer-events-none will-change-transform"
+                      className="absolute z-[25] pointer-events-none will-change-transform [@media(max-height:500px)]:scale-[0.5] [@media(max-height:500px)]:origin-bottom"
                       style={{
                         left: `${playerXRef.current - 55}px`,
-                        bottom: `${100 - playerYRef.current - 14}px`,
+                        bottom: `${(isLandscape ? 70 : 120) - playerYRef.current - 14}px`,
                       }}
                       animate={
                         isMeteorCrash
@@ -1661,9 +1649,9 @@ export default function App() {
                     )}
                     style={{
                       left: `${playerXRef.current}px`,
-                      bottom: `${100 - playerYRef.current}px`,
+                      bottom: `${(isLandscape ? 70 : 120) - playerYRef.current}px`,
                       transformOrigin: "bottom",
-                      transform: `scale(${(isFlying ? 0.9 : powerLevel === 2 ? 1.0 : powerLevel === 1 ? 1.0 : 0.8) * (isLandscape ? (currentIdx === 9 ? 1.8 : currentIdx === 3 ? 1.15 : 1.05) : currentIdx === 9 ? 2.4 : currentIdx === 3 ? 1.49 : 1)})`,
+                      transform: `scale(${(isFlying ? 0.9 : powerLevel === 2 ? 1.0 : powerLevel === 1 ? 1.0 : 0.8) * (isLandscape ? (currentIdx === 3 ? 1.3 : 1.05) : currentIdx === 3 ? 1.7 : 1)})`,
                     }}
                   >
                     <GeminiRunner
@@ -1757,7 +1745,7 @@ export default function App() {
 
         {/* World 2 Persistent UFO & Abduction Sequence */}
         {currentLevel && currentLevel.number === 7 && (
-          <div className="fixed inset-0 pointer-events-none z-[9000]">
+          <div className="fixed inset-0 pointer-events-none z-[9000] [@media(max-height:500px)]:scale-[0.5] [@media(max-height:500px)]:origin-top">
             {/* The UFO */}
             <motion.div
               className="absolute top-14 left-1/2 -translate-x-1/2"
@@ -1856,7 +1844,7 @@ export default function App() {
                   times: [0, 0.28, 0.82, 0.9],
                   ease: "easeInOut",
                 }}
-                className="absolute bottom-28 left-1/2 -translate-x-1/2 flex flex-col items-center"
+                className="absolute bottom-28 landscape:bottom-16 left-1/2 -translate-x-1/2 flex flex-col items-center"
               >
                 <div className="scale-[2.5] drop-shadow-[0_0_30px_rgba(255,255,255,0.8)]">
                   <GeminiRunner
@@ -1885,7 +1873,7 @@ export default function App() {
                   times: [0, 0.2, 0.3, 0.46, 0.58, 0.72, 0.84, 1],
                   ease: "easeInOut",
                 }}
-                className="absolute bottom-24 left-[32%] -translate-x-1/2 flex flex-col items-center"
+                className="absolute bottom-24 landscape:bottom-12 left-[32%] -translate-x-1/2 flex flex-col items-center"
               >
                 <div className="scale-[2.5] drop-shadow-[0_0_20px_rgba(200,150,50,0.5)]">
                   <Competitor
@@ -1903,8 +1891,8 @@ export default function App() {
         )}
 
         {/* Farmer Boss Overlay — tractor anchored to bottom-right ground line */}
-        {currentLevel && hasFarmer && gameState === "playing" && currentLevelRef.current?.number !== 1 && (
-          <div className="fixed bottom-[95px] right-16 pointer-events-none z-[150]">
+        {currentLevel && hasFarmer && gameState === "playing" && (
+          <div className="fixed bottom-[120px] landscape:bottom-[70px] right-16 pointer-events-none z-[150] [@media(max-height:500px)]:scale-[0.5] [@media(max-height:500px)]:origin-bottom-right">
             {/* Label */}
             <div className="flex justify-center mb-1">
               <div
@@ -2134,13 +2122,13 @@ export default function App() {
         )}
 
         {/* Professor Boss Overlay */}
-        {currentLevel && hasProfessor && gameState === "playing" && currentLevelRef.current?.number !== 1 && (
-          <div className="fixed bottom-[74px] right-16 pointer-events-none z-[150]">
+        {currentLevel && hasProfessor && gameState === "playing" && (
+          <div className="fixed bottom-[120px] landscape:bottom-[70px] right-16 pointer-events-none z-[150] [@media(max-height:500px)]:scale-[0.5] [@media(max-height:500px)]:origin-bottom-right">
             <div className="flex justify-center mb-1">
               <div
                 className={`text-white text-[8px] px-2 py-0.5 rounded font-black uppercase border border-blue-400 ${profPhase === "throwing" ? "bg-red-700" : "bg-blue-700/90"}`}
               >
-                {profPhase === "throwing" ? "TESTING!" : "DOCTOR LOCO"}
+                {profPhase === "throwing" ? "TESTING!" : "MAD PROFESSOR"}
               </div>
             </div>
             <div
@@ -2271,7 +2259,7 @@ export default function App() {
               className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full blur-xl"
               style={{
                 left: `${winWRef.current / 3}px`,
-                bottom: "140px",
+                bottom: isLandscape ? "80px" : "140px",
                 background:
                   "radial-gradient(circle, #fef3c7 0%, #f97316 40%, #dc2626 70%, transparent 100%)",
               }}
@@ -2352,10 +2340,10 @@ export default function App() {
 
         {/* TOUCH CONTROLS (Only visible on small screens) */}
         {gameState === "playing" && (
-          <div className="fixed bottom-6 inset-x-0 flex justify-between px-6 z-[60] pointer-events-none lg:hidden">
-            <div className="flex gap-4 pointer-events-auto items-end">
+          <div className="fixed bottom-6 landscape:bottom-2 inset-x-0 flex justify-between px-6 landscape:px-12 z-[60] pointer-events-none lg:hidden [@media(max-height:500px)]:scale-[0.8] [@media(max-height:500px)]:origin-bottom">
+            <div className="flex gap-4 landscape:gap-2 pointer-events-auto items-end">
               <button
-                className="w-16 h-16 bg-white/10 backdrop-blur-md border border-white/20 rounded-full flex items-center justify-center active:scale-90 active:bg-white/30 text-white text-2xl select-none shadow-xl"
+                className="w-16 h-16 landscape:w-10 landscape:h-10 bg-white/10 backdrop-blur-md border border-white/20 rounded-full flex items-center justify-center active:scale-90 active:bg-white/30 text-white text-2xl landscape:text-lg select-none shadow-xl"
                 onPointerDown={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -2375,7 +2363,7 @@ export default function App() {
                 ←
               </button>
               <button
-                className="w-16 h-16 bg-white/10 backdrop-blur-md border border-white/20 rounded-full flex items-center justify-center active:scale-90 active:bg-white/30 text-white text-2xl select-none shadow-xl"
+                className="w-16 h-16 landscape:w-10 landscape:h-10 bg-white/10 backdrop-blur-md border border-white/20 rounded-full flex items-center justify-center active:scale-90 active:bg-white/30 text-white text-2xl landscape:text-lg select-none shadow-xl"
                 onPointerDown={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -2395,14 +2383,13 @@ export default function App() {
                 →
               </button>
             </div>
-            <div className="flex gap-4 pointer-events-auto items-end">
+            <div className="flex gap-4 landscape:gap-2 pointer-events-auto items-end">
               {(powerLevel > 0 ||
                 currentIdx === 3 ||
                 currentIdx === 4 ||
-                currentIdx === 5 ||
-                currentIdx === 7) && (
+                currentIdx === 5) && (
                 <button
-                  className="w-16 h-16 bg-blue-500/40 backdrop-blur-md border border-blue-400/50 rounded-full flex items-center justify-center active:scale-90 active:bg-blue-500/60 text-white text-2xl select-none z-[75] shadow-xl"
+                  className="w-16 h-16 landscape:w-12 landscape:h-12 bg-blue-500/40 backdrop-blur-md border border-blue-400/50 rounded-full flex items-center justify-center active:scale-90 active:bg-blue-500/60 text-white text-2xl landscape:text-lg select-none z-[75] shadow-xl"
                   onPointerDown={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -2416,7 +2403,7 @@ export default function App() {
                 >
                   {currentIdx === 3
                     ? "🔫"
-                    : currentIdx === 4 || currentIdx === 5 || currentIdx === 7
+                    : currentIdx === 4 || currentIdx === 5
                       ? "⚡"
                       : "🔥"}
                 </button>
@@ -2424,7 +2411,7 @@ export default function App() {
               <div className="flex flex-col gap-2">
                 {isFlying && (
                   <button
-                    className="w-20 h-20 bg-white/10 backdrop-blur-md border border-white/20 rounded-full flex items-center justify-center active:scale-95 active:bg-white/30 text-white font-black select-none z-[70] shadow-xl text-sm"
+                    className="w-20 h-20 landscape:w-16 landscape:h-16 bg-white/10 backdrop-blur-md border border-white/20 rounded-full flex items-center justify-center active:scale-95 active:bg-white/30 text-white font-black select-none z-[70] shadow-xl text-sm"
                     onPointerDown={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -2455,7 +2442,7 @@ export default function App() {
                   </button>
                 )}
                 <button
-                  className="w-20 h-20 bg-white/20 backdrop-blur-md border border-white/40 rounded-full flex items-center justify-center active:scale-95 active:bg-white/40 text-white font-black select-none z-[70] shadow-xl text-sm"
+                  className="w-20 h-20 landscape:w-16 landscape:h-16 bg-white/20 backdrop-blur-md border border-white/40 rounded-full flex items-center justify-center active:scale-95 active:bg-white/40 text-white font-black select-none z-[70] shadow-xl text-sm"
                   onPointerDown={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -2509,7 +2496,7 @@ export default function App() {
               Reset
             </button>
           </div>
-          <div className="absolute top-0 inset-x-0 h-[40px] w-full flex justify-center z-50 pointer-events-none bg-black/80 backdrop-blur-md border-b border-white/10">
+          <div className="absolute top-0 inset-x-0 h-[40px] landscape:h-[28px] w-full flex justify-center z-50 pointer-events-none bg-black/80 backdrop-blur-md border-b border-white/10">
             <div className="flex items-center justify-between w-full max-w-4xl px-4 gap-4">
               <div className="text-[11px] font-bold text-white uppercase truncate shrink-0 max-w-[40%]">
                 {currentLevel.planetName}
@@ -2544,7 +2531,7 @@ export default function App() {
             className="fixed inset-0 w-full h-full overflow-hidden flex flex-col items-center justify-center z-[100] bg-black/95 backdrop-blur-3xl"
           >
             <div
-              className="flex flex-col items-center justify-center py-4 w-full origin-center z-10 text-center"
+              className="flex flex-col items-center justify-center py-4 w-full [@media(max-height:500px)]:scale-[0.6] origin-center z-10 text-center"
             >
               <div className="relative mb-2 md:mb-8 shrink-0">
                 <motion.div
@@ -2556,7 +2543,7 @@ export default function App() {
                   }}
                   className="absolute inset-0 border border-blue-500/20 rounded-full scale-150"
                 />
-                <Sparkles className="w-12 h-12 md:w-24 md:h-24 text-blue-400 relative z-10 drop-shadow-[0_0_30px_rgba(96,165,250,0.5)]" />
+                <Sparkles className="w-12 h-12 md:w-24 md:h-24 landscape:w-16 landscape:h-16 text-blue-400 relative z-10 drop-shadow-[0_0_30px_rgba(96,165,250,0.5)]" />
               </div>
               <h1
                 style={{ fontSize: "clamp(1rem, 4vmin, 3rem)" }}
@@ -2566,7 +2553,7 @@ export default function App() {
               </h1>
               <p
                 style={{ fontSize: "clamp(0.5rem, 2vmin, 1.5rem)" }}
-                className="text-gray-400 font-light max-w-2xl mx-auto my-1 md:my-6 leading-relaxed shrink-0 text-center px-4"
+                className="text-gray-400 font-light max-w-2xl mx-auto my-1 md:my-6 landscape:my-2 leading-relaxed shrink-0 text-center px-4"
               >
                 Run through the AI Cosmos. Dodge the competitors.
                 <br />
@@ -2579,7 +2566,7 @@ export default function App() {
                   e.stopPropagation();
                   handleStart();
                 }}
-                className="mt-2 md:mt-4 px-6 md:px-8 py-3 md:py-4 bg-blue-600 text-white font-black text-lg md:text-3xl rounded-full hover:bg-blue-500 hover:scale-110 active:scale-95 transition-all shadow-2xl flex items-center gap-3"
+                className="mt-2 md:mt-4 px-6 md:px-8 py-3 md:py-4 bg-blue-600 text-white font-black text-lg md:text-3xl rounded-full hover:bg-blue-500 hover:scale-110 active:scale-95 transition-all shadow-2xl flex items-center gap-3 landscape:text-lg landscape:py-2 landscape:px-6"
               >
                 START DISCOVERY{" "}
                 <ChevronRight className="w-6 h-6 md:w-8 md:h-8" />
@@ -2588,7 +2575,7 @@ export default function App() {
                 <p className="text-white/30 text-[10px] uppercase tracking-widest">
                   — Jump to World —
                 </p>
-                <div className="flex justify-center gap-1.5 md:gap-2 max-w-full overflow-x-visible">
+                <div className="flex flex-wrap justify-center gap-2 max-w-xs">
                   {LEVELS.map((level, idx) => (
                     <button
                       key={idx}
@@ -2596,13 +2583,9 @@ export default function App() {
                         e.stopPropagation();
                         handleJumpToLevel(idx);
                       }}
-                      className={cn(
-                        "w-8 h-8 md:w-10 md:h-10 flex items-center justify-center bg-white/5 hover:bg-blue-600/80 border border-white/10 rounded-lg text-white/40 hover:text-white font-black text-xs md:text-sm transition-all hover:scale-110 active:scale-95 shadow-lg group relative overflow-hidden",
-                        level.number === 1 && "border-blue-500/30 bg-blue-500/5"
-                      )}
+                      className="w-7 h-7 landscape:w-6 landscape:h-6 bg-white/5 hover:bg-blue-600 border border-white/10 rounded border-b-2 text-white/50 hover:text-white font-black text-[10px] md:text-xs transition-all hover:scale-110 active:scale-95"
                     >
-                      <span className="relative z-10">{level.number}</span>
-                      <div className="absolute inset-0 bg-gradient-to-t from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                      {level.number}
                     </button>
                   ))}
                 </div>
@@ -2628,9 +2611,7 @@ export default function App() {
 
             {/* Space Mini-Game Background */}
             {(currentLevel?.environment === "void" ||
-              currentLevel?.environment === "nebula") && (
-                <TransitionGame variant={currentLevel.environment === "nebula" ? "ship" : "orb"} />
-            )}
+              currentLevel?.environment === "nebula") && <TransitionGame />}
 
             {/* Watermark number */}
             <motion.div
@@ -2649,7 +2630,7 @@ export default function App() {
             </motion.div>
 
             <div
-              className="flex flex-col items-center justify-center py-4 relative w-full origin-center z-10"
+              className="flex flex-col items-center justify-center py-4 relative w-full [@media(max-height:500px)]:scale-[0.6] origin-center z-10"
             >
               <motion.div
                 initial={{ scale: 0 }}
@@ -2751,7 +2732,7 @@ export default function App() {
             className="fixed inset-0 w-full h-full overflow-hidden flex flex-col items-center justify-center z-[9999] bg-black/90 backdrop-blur-md"
           >
             <div
-              className="flex flex-col items-center justify-center py-4 px-4 w-full origin-center z-10"
+              className="flex flex-col items-center justify-center py-4 px-4 w-full [@media(max-height:500px)]:scale-[0.6] origin-center z-10"
             >
               <div className="flex flex-col items-center mb-6">
                 <motion.div
@@ -2787,7 +2768,7 @@ export default function App() {
                   e.stopPropagation();
                   handleReset();
                 }}
-                className="px-6 md:px-12 py-3 md:py-6 bg-blue-600 text-white font-black text-lg md:text-3xl rounded-full hover:bg-white hover:text-blue-600 transition-all shadow-[0_0_60px_rgba(59,130,246,0.9)] flex items-center gap-4 group"
+                className="px-6 md:px-12 py-3 md:py-6 bg-blue-600 text-white font-black text-lg md:text-3xl rounded-full hover:bg-white hover:text-blue-600 transition-all shadow-[0_0_60px_rgba(59,130,246,0.9)] flex items-center gap-4 group landscape:text-lg landscape:py-3 landscape:px-6"
               >
                 <RotateCcw className="w-10 h-10 group-hover:rotate-180 transition-transform" />{" "}
                 REBOOT MISSION
@@ -2797,57 +2778,37 @@ export default function App() {
         )}
 
         {gameState === "complete" && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-            <motion.div 
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="relative w-full max-w-2xl bg-white/10 backdrop-blur-xl border border-white/20 rounded-[40px] p-8 md:p-12 text-center shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden"
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="fixed inset-0 w-full h-full overflow-hidden flex flex-col items-center justify-center z-[9999] bg-blue-950/90 backdrop-blur-md"
+          >
+            <div
+              className="flex flex-col items-center justify-center py-4 w-full [@media(max-height:500px)]:scale-[0.6] origin-center z-10"
             >
-              {/* Animated Background Glows */}
-              <div className="absolute -top-24 -left-24 w-64 h-64 bg-blue-500/20 rounded-full blur-[80px]" />
-              <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-red-500/20 rounded-full blur-[80px]" />
-              
-              <div className="relative z-10 flex flex-col items-center">
-                {/* Modernized Google Logo Display */}
-                <motion.div
-                  className="w-32 h-32 md:w-40 md:h-40 rounded-3xl bg-white shadow-[0_10px_30px_rgba(255,255,255,0.2)] flex items-center justify-center mb-8 relative group"
-                  animate={{ 
-                    y: [0, -10, 0],
-                    rotate: [0, 2, -2, 0]
-                  }}
-                  transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
-                >
-                  <svg viewBox="0 0 24 24" className="w-16 h-16 md:w-20 md:h-20" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
-                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 12-4.53z" fill="#EA4335"/>
-                  </svg>
-                  
-                  {/* Subtle rings around logo */}
-                  <div className="absolute inset-0 rounded-3xl border-2 border-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </motion.div>
-
-                <h2 className="text-5xl md:text-7xl font-black text-white mb-6 tracking-tighter">
-                  THANK YOU!
-                </h2>
-                
-                <p className="text-blue-100/80 text-lg md:text-xl font-medium max-w-md mx-auto mb-10 leading-relaxed">
-                  The mission is complete. Your Gemini collection is synchronized and ready for the future.
-                </p>
-
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleReset}
-                  className="px-10 py-4 bg-white text-slate-900 rounded-full font-black text-xl shadow-xl hover:shadow-white/20 transition-all flex items-center gap-3"
-                >
-                  <RotateCcw className="w-6 h-6" />
-                  RESTART JOURNEY
-                </motion.button>
-              </div>
-            </motion.div>
-          </div>
+              <h2
+                style={{ fontSize: "clamp(1rem, 4vmin, 3rem)" }}
+                className="leading-none font-black tracking-tighter italic text-center"
+              >
+                UNITY
+              </h2>
+              <p
+                style={{ fontSize: "clamp(0.5rem, 2vmin, 1.5rem)" }}
+                className="text-blue-200 mt-4 mb-12 text-center px-4"
+              >
+                Gemini has unified the 10 dimensions.
+              </p>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleReset();
+                }}
+                className="flex items-center gap-4 px-8 py-4 bg-white text-blue-900 font-black text-lg md:text-2xl rounded-full hover:scale-110 transition-all shadow-2xl"
+              >
+                <RotateCcw className="w-8 h-8" /> RESTART VOYAGE
+              </button>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -2864,8 +2825,8 @@ export default function App() {
           />
         )}
       </AnimatePresence>
-    
-      </div>
-</main>
+
+      <RotateScreen />
+    </main>
   );
 }
